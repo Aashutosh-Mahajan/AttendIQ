@@ -74,7 +74,7 @@ export default function AppShell({ children }: AppShellProps) {
             <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">LIVE</span>
           </div>
           <p className="text-sm font-semibold text-white truncate">
-            {semesterInfo ? semesterInfo.name : 'Spring 2026 Semester'}
+            {semesterInfo ? semesterInfo.name : 'No semester yet'}
           </p>
         </div>
 

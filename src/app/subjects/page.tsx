@@ -119,14 +119,21 @@ export default function SubjectsPage() {
           <div className="h-56 rounded-2xl bg-white/5 animate-pulse" />
         </div>
       ) : subjects.length === 0 ? (
-        <div className="glass-card rounded-2xl p-12 text-center text-gray-400 space-y-3">
-          <BookOpen className="h-12 w-12 text-indigo-400 mx-auto opacity-50" />
-          <p className="text-sm font-medium">No subjects created yet.</p>
+        <div className="glass-card rounded-2xl p-16 text-center space-y-4">
+          <div className="h-16 w-16 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center mx-auto">
+            <BookOpen className="h-7 w-7 text-indigo-400" />
+          </div>
+          <div className="space-y-1">
+            <p className="text-base font-semibold text-white">No subjects yet</p>
+            <p className="text-xs text-gray-500 max-w-xs mx-auto">
+              Start by adding your subjects here, then head to the Timetable Builder to set your weekly schedule.
+            </p>
+          </div>
           <button
-            onClick={() => setIsModalOpen(true)}
-            className="px-4 py-2 rounded-xl bg-indigo-600 text-white text-xs font-medium"
+            onClick={() => { setErrorMsg(''); setIsModalOpen(true); }}
+            className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-lg shadow-indigo-600/25 transition-all"
           >
-            Create First Subject
+            Add Your First Subject
           </button>
         </div>
       ) : (
