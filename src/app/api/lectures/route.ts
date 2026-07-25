@@ -64,14 +64,17 @@ export async function PATCH(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    // Bulk Holiday for an entire day
+    // Bulk attendance update for an entire day
     const user = await prisma.user.findFirst();
     if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
 
     const body = await req.json();
-    const { date } = body;
+    const { date, status = 'HOLIDAY' } = body;
 
     if (!date) return NextResponse.json({ error: 'Missing date' }, { status: 400 });
+    if (!['ATTENDED', 'MISSED', 'HOLIDAY', 'SCHEDULED'].includes(status)) {
+      return NextResponse.json({ error: 'Invalid attendance status' }, { status: 400 });
+    }
 
     const targetDate = startOfDay(new Date(date));
     const targetEnd = endOfDay(new Date(date));
@@ -85,11 +88,11 @@ export async function POST(req: Request) {
         },
       },
       data: {
-        status: 'HOLIDAY',
+        status,
       },
     });
 
-    return NextResponse.json({ success: true, message: 'All lectures marked as Holiday.' });
+    return NextResponse.json({ success: true, message: `All lectures marked as ${status}.` });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

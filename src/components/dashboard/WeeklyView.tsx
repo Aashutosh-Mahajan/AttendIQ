@@ -25,9 +25,12 @@ import {
   AlertTriangle,
   Zap,
   CalendarDays,
+  CheckCircle2,
+  XCircle,
   X,
 } from 'lucide-react';
 import LectureCard, { Lecture } from './LectureCard';
+import LiveClock from './LiveClock';
 
 /* ─── Mini Calendar Component ─── */
 function MiniCalendar({
@@ -146,6 +149,7 @@ export default function WeeklyView() {
   const [lectures, setLectures] = useState<Lecture[]>([]);
   const [loading, setLoading] = useState(true);
   const [calendarOpen, setCalendarOpen] = useState(false);
+  const [selectedLecture, setSelectedLecture] = useState<Lecture | null>(null);
   const [overallHealth, setOverallHealth] = useState<{ percentage: number; bunkable: number; mustAttend: number }>({
     percentage: 100,
     bunkable: 0,
@@ -215,18 +219,18 @@ export default function WeeklyView() {
     }
   };
 
-  const handleBulkHoliday = async (dayDate: Date) => {
+  const handleBulkStatusChange = async (dayDate: Date, status: Lecture['status']) => {
     const formatted = format(dayDate, 'yyyy-MM-dd');
     setLectures((prev) =>
       prev.map((lec) =>
-        isSameDay(new Date(lec.date), dayDate) ? { ...lec, status: 'HOLIDAY' } : lec
+        isSameDay(new Date(lec.date), dayDate) ? { ...lec, status } : lec
       )
     );
     try {
       await fetch('/api/lectures', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ date: formatted }),
+        body: JSON.stringify({ date: formatted, status }),
       });
       fetchOverallHealth();
     } catch {
@@ -296,9 +300,12 @@ export default function WeeklyView() {
 
           {/* Right: week nav */}
           <div className="flex items-center gap-2">
+            <LiveClock />
             <button
               onClick={() => setCurrentWeekStart((w) => subWeeks(w, 1))}
               className="p-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-gray-300 transition-all"
+              aria-label="Previous week"
+              title="Previous week"
             >
               <ChevronLeft className="h-4 w-4" />
             </button>
@@ -306,11 +313,13 @@ export default function WeeklyView() {
               onClick={() => setCurrentWeekStart(startOfWeek(new Date(), { weekStartsOn: 1 }))}
               className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 border border-indigo-400/30 text-white font-semibold text-xs shadow-md shadow-indigo-600/25 transition-all"
             >
-              Today
+              This week
             </button>
             <button
               onClick={() => setCurrentWeekStart((w) => addWeeks(w, 1))}
               className="p-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-gray-300 transition-all"
+              aria-label="Next week"
+              title="Next week"
             >
               <ChevronRight className="h-4 w-4" />
             </button>
@@ -359,13 +368,34 @@ export default function WeeklyView() {
                       {attendedCount}/{totalCount}
                     </span>
                   )}
-                  <button
-                    onClick={() => handleBulkHoliday(dayDate)}
-                    className="p-1.5 rounded-lg bg-white/5 hover:bg-amber-500/20 text-gray-500 hover:text-amber-300 transition-all"
-                    title="Mark full day as Holiday"
-                  >
-                    <Sun className="h-3.5 w-3.5" />
-                  </button>
+                  {totalCount > 0 && (
+                    <div className="flex items-center gap-1" aria-label="Mark all lectures for this day">
+                      <button
+                        onClick={() => handleBulkStatusChange(dayDate, 'ATTENDED')}
+                        className="p-1.5 rounded-lg bg-white/5 hover:bg-emerald-500/20 text-gray-500 hover:text-emerald-300 transition-all"
+                        title="Mark all lectures attended"
+                        aria-label="Mark all lectures attended"
+                      >
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        onClick={() => handleBulkStatusChange(dayDate, 'MISSED')}
+                        className="p-1.5 rounded-lg bg-white/5 hover:bg-rose-500/20 text-gray-500 hover:text-rose-300 transition-all"
+                        title="Mark all lectures not attended"
+                        aria-label="Mark all lectures not attended"
+                      >
+                        <XCircle className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        onClick={() => handleBulkStatusChange(dayDate, 'HOLIDAY')}
+                        className="p-1.5 rounded-lg bg-white/5 hover:bg-amber-500/20 text-gray-500 hover:text-amber-300 transition-all"
+                        title="Mark all lectures as holiday"
+                        aria-label="Mark all lectures as holiday"
+                      >
+                        <Sun className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -386,7 +416,7 @@ export default function WeeklyView() {
                   </div>
                 ) : (
                   dayLectures.map((lec) => (
-                    <LectureCard key={lec.id} lecture={lec} onStatusChange={handleStatusChange} />
+                    <LectureCard key={lec.id} lecture={lec} onOpen={setSelectedLecture} />
                   ))
                 )}
               </div>
@@ -394,6 +424,27 @@ export default function WeeklyView() {
           );
         })}
       </div>
+      {selectedLecture && (
+        <div className="fixed inset-0 z-50 bg-[#0b0f17]/80 backdrop-blur-md flex items-center justify-center p-4" onMouseDown={() => setSelectedLecture(null)}>
+          <div className="glass-card rounded-2xl max-w-md w-full p-6 border border-white/10 space-y-5" onMouseDown={(event) => event.stopPropagation()}>
+            <div className="flex items-start justify-between gap-4 border-b border-white/10 pb-4">
+              <div><p className="text-xs text-cyan-400 font-semibold">Attendance</p><h3 className="text-lg font-bold text-white mt-1">{selectedLecture.subject.name}</h3><p className="text-xs text-gray-400 mt-1">{format(new Date(selectedLecture.date), 'EEEE, d MMM')} · {selectedLecture.startTime} – {selectedLecture.endTime}</p></div>
+              <button onClick={() => setSelectedLecture(null)} className="p-1 rounded-lg text-gray-400 hover:text-white"><X className="h-5 w-5" /></button>
+            </div>
+            <p className="text-sm text-gray-300">How should this lecture be recorded?</p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              {([
+                ['ATTENDED', 'Attended', CheckCircle2, 'bg-emerald-600 hover:bg-emerald-500'],
+                ['MISSED', 'Missed', XCircle, 'bg-rose-600 hover:bg-rose-500'],
+                ['HOLIDAY', 'Holiday', Sun, 'bg-amber-600 hover:bg-amber-500'],
+              ] as const).map(([status, label, Icon, className]) => (
+                <button key={status} onClick={() => { handleStatusChange(selectedLecture.id, status); setSelectedLecture(null); }} className={`flex flex-col items-center gap-1.5 p-3 rounded-xl text-white text-xs font-semibold transition ${className}`}><Icon className="h-4 w-4" />{label}</button>
+              ))}
+            </div>
+            {selectedLecture.status !== 'SCHEDULED' && <button onClick={() => { handleStatusChange(selectedLecture.id, 'SCHEDULED'); setSelectedLecture(null); }} className="w-full py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs text-gray-300">Reset to scheduled</button>}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
