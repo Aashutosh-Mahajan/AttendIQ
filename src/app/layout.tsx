@@ -3,7 +3,7 @@ import './globals.css';
 import AppShell from '@/components/layout/AppShell';
 
 export const metadata: Metadata = {
-  title: 'AttendIQ — Smart College Attendance & Bunk Calculator',
+  title: 'AttendIQ — Smart College Attendance Tracker',
   description: 'Track college attendance, auto-generate weekly lecture schedules, and calculate safe skips vs required classes.',
 };
 

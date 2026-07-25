@@ -53,7 +53,7 @@ export default function AppShell({ children }: AppShellProps) {
   const navItems = [
     { href: '/', label: 'Weekly Dashboard', icon: Calendar },
     { href: '/timetable', label: 'Timetable Builder', icon: Clock },
-    { href: '/subjects', label: 'Subjects & Bunk Engine', icon: BookOpen },
+    { href: '/subjects', label: 'Subjects & Attendance', icon: BookOpen },
     { href: '/analytics', label: 'Analytics & Insights', icon: BarChart3 },
     { href: '/settings', label: 'Settings', icon: Settings },
   ];
@@ -71,7 +71,7 @@ export default function AppShell({ children }: AppShellProps) {
             <h1 className="font-bold text-xl tracking-tight text-white flex items-center gap-1.5">
               Attend<span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-cyan-400">IQ</span>
             </h1>
-            <p className="text-[11px] font-medium text-gray-400">Smart Bunk & Attendance Tracker</p>
+            <p className="text-[11px] font-medium text-gray-400">Smart Attendance Tracker</p>
           </div>
         </div>
 

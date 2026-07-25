@@ -149,7 +149,7 @@ function renderEmailWrapper(contentHtml: string, previewText: string = '') {
       <div class="header">
         <div class="logo-badge">⚡</div>
         <h1 class="brand-title">Attend<span class="brand-cyan">IQ</span></h1>
-        <p style="margin: 4px 0 0 0; font-size: 12px; color: #9ca3af; font-weight: 500;">Smart College Attendance & Bunk Calculator</p>
+        <p style="margin: 4px 0 0 0; font-size: 12px; color: #9ca3af; font-weight: 500;">Smart College Attendance Tracker</p>
       </div>
 
       <div class="body-content">
@@ -228,7 +228,7 @@ export async function sendWelcomeEmail(email: string, name: string = 'Student') 
     </h2>
 
     <p style="color: #9ca3af; text-align: center; margin-bottom: 24px;">
-      Your account is fully created and ready to go. You can now take complete control of your college attendance and bunk calculations.
+      Your account is fully created and ready to go. You can now take complete control of your college attendance calculations.
     </p>
 
     <div class="feature-box">
@@ -247,7 +247,7 @@ export async function sendWelcomeEmail(email: string, name: string = 'Student') 
         <tr>
           <td width="32" valign="top" style="font-size: 18px; padding-bottom: 12px;">🧮</td>
           <td style="padding-bottom: 12px;">
-            <strong style="color: #ffffff; font-size: 14px;">Live Bunk Engine</strong><br>
+            <strong style="color: #ffffff; font-size: 14px;">Attendance Engine</strong><br>
             <span style="color: #9ca3af; font-size: 13px;">Instant calculations showing exact safe skips available or required classes to reach your target %.</span>
           </td>
         </tr>

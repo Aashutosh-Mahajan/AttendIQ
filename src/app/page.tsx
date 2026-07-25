@@ -86,7 +86,7 @@ export default function Home() {
                 <Sparkles className="h-5 w-5 text-emerald-400" />
               </div>
               <div className="flex-1 text-left">
-                <p className="text-sm font-semibold text-white">Step 3: Track & Bunk Smartly</p>
+                <p className="text-sm font-semibold text-white">Step 3: Track Attendance Smartly</p>
                 <p className="text-xs text-gray-500">Auto-generated lectures will appear here</p>
               </div>
             </div>

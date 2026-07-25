@@ -2,9 +2,9 @@
 
 # ⚡ AttendIQ
 
-### **Smart College Attendance Tracker & Live Bunk Calculator**
+### **Smart College Attendance Tracker**
 
-*Never guess "Can I skip this class?" again. Automated lecture scheduling, live attendance analytics, and intelligent skip/attend recommendations.*
+*Automated lecture scheduling, live attendance analytics, and intelligent safe skip & recovery recommendations.*
 
 [![Next.js](https://img.shields.io/badge/Next.js-15-black?style=for-the-badge&logo=next.js)](https://nextjs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?style=for-the-badge&logo=typescript)](https://www.typescriptlang.org/)
@@ -20,7 +20,7 @@
 
 **AttendIQ** is a personal web application designed for college students to track subject-wise and overall attendance effortlessly. By defining your weekly timetable once, AttendIQ automatically generates your daily lecture schedule.
 
-With the built-in **Live Bunk Engine**, the app calculates exactly how many classes you can safely skip while staying above your target percentage (e.g. 75%), or how many consecutive classes you must attend if you fall below threshold.
+With the built-in **Attendance Engine**, the app calculates exactly how many classes you can safely miss while staying above your target percentage (e.g. 75%), or how many consecutive classes you must attend if you fall below threshold.
 
 ---
 
@@ -28,13 +28,13 @@ With the built-in **Live Bunk Engine**, the app calculates exactly how many clas
 
 - 📅 **Weekly Interactive Dashboard**: 
   - Day-by-day 6-column view (Monday–Saturday) with lecture cards.
-  - One-tap status cycling: `Scheduled` $\rightarrow$ `Attended` $\rightarrow$ `Missed` $\rightarrow$ `Holiday`.
+  - Status management: `Scheduled`, `Attended`, `Missed`, and `Holiday`.
   - Bulk **Mark Day as Holiday** for college closures.
   - Week-by-week navigation controls with instant "Today" jump.
 
-- 🧮 **Live Bunk & Must-Attend Engine**:
+- 🧮 **Safe Skips & Recovery Engine**:
   - Real-time attendance percentage calculation.
-  - **Safe Skips Indicator**: Tells you exact number of classes you can bunk without dropping below target %.
+  - **Safe Skips Indicator**: Tells you exact number of classes you can miss without dropping below target %.
   - **Recovery Indicator**: Tells you exact number of consecutive classes required to recover lost attendance.
 
 - ⚡ **Rolling-Window Lecture Generator**:
@@ -94,13 +94,13 @@ $$N = \left\lceil \frac{(\text{Target Ratio} \times \text{Counted}) - \text{Atte
 AttendIQ/
 ├── prisma/
 │   ├── schema.prisma       # Prisma data schema (User, Semester, Subject, TimetableSlot, LectureInstance)
-│   └── seed.ts             # Seed script populating demo semester, subjects, timetable & history
+│   └── seed.ts             # Seed script populating demo user & semester
 ├── src/
 │   ├── app/
 │   │   ├── analytics/      # Analytics & Recharts page (/analytics)
-│   │   ├── api/            # REST API endpoints (semesters, subjects, timetable, lectures)
+│   │   ├── api/            # REST API endpoints (auth, semesters, subjects, timetable, lectures)
 │   │   ├── settings/       # Settings & Semester Management (/settings)
-│   │   ├── subjects/       # Subjects & Live Bunk Engine (/subjects)
+│   │   ├── subjects/       # Subjects & Attendance (/subjects)
 │   │   ├── timetable/      # Weekly Timetable Builder (/timetable)
 │   │   ├── globals.css     # Dark obsidian theme & glassmorphism utilities
 │   │   ├── layout.tsx      # Root layout wrapped in AppShell navigation
@@ -109,10 +109,10 @@ AttendIQ/
 │   │   ├── analytics/      # Recharts bar & line chart components
 │   │   ├── dashboard/      # WeeklyView & LectureCard components
 │   │   ├── layout/         # AppShell sidebar navigation & header
-│   │   ├── subject/        # BunkCalculatorCard & status widgets
+│   │   ├── subject/        # Subject attendance status components
 │   │   └── timetable/      # TimetableGrid scheduler component
 │   └── lib/
-│       ├── calculator.ts   # Attendance & bunk calculation engine
+│       ├── calculator.ts   # Attendance & safe skip calculation engine
 │       ├── generator.ts    # Rolling lecture auto-generation engine
 │       └── prisma.ts       # Singleton PrismaClient instance
 ├── tailwind.config.js      # Custom obsidian color palette & glow utilities
@@ -141,7 +141,7 @@ AttendIQ/
    npm install
    ```
 
-3. **Setup Database Schema & Seed Demo Data**:
+3. **Setup Database Schema & Seed Data**:
    ```bash
    npx prisma db push
    npx tsx prisma/seed.ts
@@ -165,7 +165,7 @@ AttendIQ/
 | `npm run build` | Builds the production bundle and runs type checks |
 | `npm start` | Starts the production server |
 | `npx prisma db push` | Syncs the Prisma schema with the SQLite database |
-| `npx tsx prisma/seed.ts` | Seeds the database with demo subjects, timetable, and attendance history |
+| `npx tsx prisma/seed.ts` | Seeds the database |
 
 ---
 
