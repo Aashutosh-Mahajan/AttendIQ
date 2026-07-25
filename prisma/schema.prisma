@@ -1,0 +1,85 @@
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id               String            @id @default(uuid())
+  email            String            @unique
+  name             String?
+  password         String
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  semesters        Semester[]
+  subjects         Subject[]
+  timetableSlots   TimetableSlot[]
+  lectureInstances LectureInstance[]
+}
+
+model Semester {
+  id               String            @id @default(uuid())
+  userId           String
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name             String
+  startDate        DateTime
+  endDate          DateTime
+  isActive         Boolean           @default(true)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  subjects         Subject[]
+}
+
+model Subject {
+  id               String            @id @default(uuid())
+  userId           String
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  semesterId       String
+  semester         Semester          @relation(fields: [semesterId], references: [id], onDelete: Cascade)
+  name             String
+  code             String?
+  color            String            @default("#6366f1")
+  targetPercentage Float             @default(75.0)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  timetableSlots   TimetableSlot[]
+  lectureInstances LectureInstance[]
+}
+
+model TimetableSlot {
+  id               String            @id @default(uuid())
+  userId           String
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subjectId        String
+  subject          Subject           @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  dayOfWeek        Int               // 1 = Monday, 2 = Tuesday, ..., 6 = Saturday, 0 = Sunday
+  startTime        String            // "09:00"
+  endTime          String            // "10:00"
+  room             String?
+  isActive         Boolean           @default(true)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  lectureInstances LectureInstance[]
+}
+
+model LectureInstance {
+  id               String         @id @default(uuid())
+  userId           String
+  user             User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subjectId        String
+  subject          Subject        @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  timetableSlotId  String?
+  timetableSlot    TimetableSlot? @relation(fields: [timetableSlotId], references: [id], onDelete: SetNull)
+  date             DateTime
+  startTime        String         @default("09:00")
+  endTime          String         @default("10:00")
+  status           String         @default("SCHEDULED") // "SCHEDULED", "ATTENDED", "MISSED", "HOLIDAY"
+  notes            String?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  @@unique([subjectId, date, startTime], name: "subject_date_time_unique")
+}
