@@ -2,12 +2,13 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { calculateAttendance } from '@/lib/calculator';
 import { generateLecturesForUser } from '@/lib/generator';
+import { getAuthenticatedUser } from '@/lib/auth';
 
 export async function GET() {
   try {
     // For single user demo, get default user
-    const user = await prisma.user.findFirst();
-    if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    const user = await getAuthenticatedUser();
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const activeSemester = await prisma.semester.findFirst({
       where: { userId: user.id, isActive: true },
@@ -57,8 +58,8 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
-    const user = await prisma.user.findFirst();
-    if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    const user = await getAuthenticatedUser();
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const body = await req.json();
     const { name, startDate, endDate, makeActive } = body;
@@ -98,8 +99,8 @@ export async function POST(req: Request) {
 
 export async function PATCH(req: Request) {
   try {
-    const user = await prisma.user.findFirst();
-    if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    const user = await getAuthenticatedUser();
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const { id, name, startDate, endDate } = await req.json();
     if (!id || !name?.trim() || !startDate || !endDate) {

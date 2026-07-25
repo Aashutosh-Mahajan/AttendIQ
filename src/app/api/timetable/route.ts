@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { generateLecturesForUser } from '@/lib/generator';
 import { startOfDay } from 'date-fns';
+import { getAuthenticatedUser } from '@/lib/auth';
 
 async function resolveSubject(userId: string, semesterId: string, subjectName?: string, subjectId?: string) {
   if (subjectId) {
@@ -21,8 +22,8 @@ async function resolveSubject(userId: string, semesterId: string, subjectName?: 
 
 export async function GET() {
   try {
-    const user = await prisma.user.findFirst();
-    if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    const user = await getAuthenticatedUser();
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const activeSemester = await prisma.semester.findFirst({
       where: { userId: user.id, isActive: true },
@@ -49,8 +50,8 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
-    const user = await prisma.user.findFirst();
-    if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    const user = await getAuthenticatedUser();
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const body = await req.json();
     const { subjectId, subjectName, dayOfWeek, startTime, endTime, room } = body;
@@ -108,8 +109,8 @@ export async function POST(req: Request) {
 
 export async function PUT(req: Request) {
   try {
-    const user = await prisma.user.findFirst();
-    if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    const user = await getAuthenticatedUser();
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const { id, subjectName, dayOfWeek, startTime, endTime, room } = await req.json();
     if (!id || !subjectName?.trim() || !startTime || !endTime || startTime >= endTime) {
@@ -151,8 +152,8 @@ export async function DELETE(req: Request) {
     const id = searchParams.get('id');
     if (!id) return NextResponse.json({ error: 'Missing slot id' }, { status: 400 });
 
-    const user = await prisma.user.findFirst();
-    if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    const user = await getAuthenticatedUser();
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     // Keep completed history but remove scheduled future occurrences.
     await prisma.lectureInstance.deleteMany({

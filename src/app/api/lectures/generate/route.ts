@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { generateLecturesForUser } from '@/lib/generator';
+import { getAuthenticatedUser } from '@/lib/auth';
 
 export async function POST() {
   try {
-    const user = await prisma.user.findFirst();
-    if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    const user = await getAuthenticatedUser();
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const result = await generateLecturesForUser(user.id);
 

@@ -7,6 +7,7 @@ import { BookOpen, Clock, ArrowRight, Sparkles, Zap } from 'lucide-react';
 
 export default function Home() {
   const [hasSubjects, setHasSubjects] = useState<boolean | null>(null);
+  const [userName, setUserName] = useState('Student');
 
   useEffect(() => {
     fetch('/api/subjects')
@@ -15,6 +16,10 @@ export default function Home() {
         setHasSubjects(data.subjects && data.subjects.length > 0);
       })
       .catch(() => setHasSubjects(false));
+  }, []);
+
+  useEffect(() => {
+    fetch('/api/auth/me').then((res) => res.ok ? res.json() : null).then((data) => { if (data?.user?.name) setUserName(data.user.name); }).catch(() => {});
   }, []);
 
   // Loading
@@ -92,5 +97,5 @@ export default function Home() {
   }
 
   // Normal Dashboard
-  return <WeeklyView />;
+  return <div className="space-y-6"><div><p className="text-sm text-cyan-300 font-semibold">Hello, {userName}</p><h1 className="text-2xl font-bold text-white mt-1">Here&apos;s your attendance week</h1><p className="text-sm text-gray-400 mt-1">Review lectures, record attendance, and keep your targets on track.</p></div><WeeklyView /></div>;
 }

@@ -12,12 +12,33 @@ model User {
   email            String            @unique
   name             String?
   password         String
+  emailVerified    DateTime?
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
   semesters        Semester[]
   subjects         Subject[]
   timetableSlots   TimetableSlot[]
   lectureInstances LectureInstance[]
+  sessions         Session[]
+  verificationCodes VerificationCode[]
+}
+
+model Session {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+model VerificationCode {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  codeHash  String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
 }
 
 model Semester {

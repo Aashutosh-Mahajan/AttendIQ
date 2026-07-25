@@ -1,144 +1,20 @@
 'use client';
 
-import React from 'react';
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  ReferenceLine,
-  LineChart,
-  Line,
-} from 'recharts';
-import { Award, Target, Flame, AlertCircle } from 'lucide-react';
+import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { Award, Flame, Target } from 'lucide-react';
 
-interface SubjectAnalytics {
-  name: string;
-  code?: string | null;
-  color: string;
-  percentage: number;
-  targetPercentage: number;
-  attended: number;
-  total: number;
+export interface SubjectAnalytics { name: string; code?: string | null; color: string; percentage: number; targetPercentage: number; attended: number; total: number }
+export interface TrendPoint { week: string; percentage: number }
+
+export default function AttendanceCharts({ subjects, overallPercentage, trendData }: { subjects: SubjectAnalytics[]; overallPercentage: number; trendData: TrendPoint[] }) {
+  const safeSubjects = subjects.filter((subject) => subject.total > 0 && subject.percentage >= subject.targetPercentage).length;
+  return <div className="space-y-6"><div className="grid grid-cols-1 md:grid-cols-3 gap-4"><Metric icon={<Award className="h-6 w-6" />} label="Overall attendance" value={subjects.some((subject) => subject.total > 0) ? `${overallPercentage}%` : '—'} tone="indigo" /><Metric icon={<Target className="h-6 w-6" />} label="Active subjects" value={`${subjects.length} subject${subjects.length === 1 ? '' : 's'}`} tone="cyan" /><Metric icon={<Flame className="h-6 w-6" />} label="On target" value={`${safeSubjects} / ${subjects.length}`} tone="emerald" /></div>
+    {subjects.length === 0 ? <div className="glass-card rounded-2xl p-12 text-center"><h3 className="text-lg font-bold text-white">No subjects to analyse</h3><p className="text-sm text-gray-400 mt-2">Add subjects and record attendance to unlock insights.</p></div> : <><section className="glass-card rounded-2xl p-6"><h3 className="text-lg font-bold text-white">Subject attendance</h3><p className="text-xs text-gray-400 mt-1">Your coloured bar is recorded attendance; the thin marker is that subject’s target.</p><div className="mt-6 space-y-5">{subjects.map((subject) => { const hasRecords = subject.total > 0; const percentage = hasRecords ? Math.max(0, Math.min(subject.percentage, 100)) : 0; return <div key={subject.name} className="space-y-2"><div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1"><div><span className="text-sm font-semibold text-white">{subject.name}</span>{subject.code && <span className="ml-2 text-[10px] text-gray-500">{subject.code}</span>}</div><span className="text-xs text-gray-400">{hasRecords ? `${subject.attended}/${subject.total} attended · ${percentage}%` : 'No attendance recorded'}</span></div><div className="relative h-3 rounded-full bg-white/5 border border-white/10 overflow-visible"><div className="h-full rounded-full transition-all duration-500" style={{ width: `${percentage}%`, backgroundColor: subject.color }} /><span className="absolute -top-1 h-5 w-0.5 bg-white shadow-[0_0_6px_rgba(255,255,255,0.8)]" style={{ left: `${Math.max(1, Math.min(subject.targetPercentage, 99))}%` }} title={`Target: ${subject.targetPercentage}%`} /><span className="absolute -top-5 -translate-x-1/2 text-[10px] text-gray-400" style={{ left: `${Math.max(3, Math.min(subject.targetPercentage, 97))}%` }}>{subject.targetPercentage}%</span></div></div>; })}</div></section>
+      <section className="glass-card rounded-2xl p-6"><h3 className="text-lg font-bold text-white">Recorded weekly trend</h3><p className="text-xs text-gray-400 mt-1">Based only on lectures marked attended or not attended.</p>{trendData.length === 0 ? <p className="text-sm text-gray-500 py-16 text-center">Mark lecture attendance to see your real weekly trend.</p> : <div className="h-60 mt-5"><ResponsiveContainer width="100%" height="100%"><LineChart data={trendData} margin={{ top: 10, right: 10, left: -20 }}><CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" /><XAxis dataKey="week" stroke="#9ca3af" fontSize={12} /><YAxis domain={[0, 100]} stroke="#9ca3af" fontSize={12} unit="%" /><Tooltip contentStyle={{ backgroundColor: '#0b0f17', borderColor: 'rgba(255,255,255,0.1)', borderRadius: 12, color: '#fff' }} formatter={(value: number) => `${value}%`} /><Line name="Attendance" type="monotone" dataKey="percentage" stroke="#06b6d4" strokeWidth={3} dot={{ fill: '#06b6d4', r: 4 }} /></LineChart></ResponsiveContainer></div>}</section></>}
+  </div>;
 }
 
-interface AttendanceChartsProps {
-  subjects: SubjectAnalytics[];
-  overallPercentage: number;
-}
-
-export default function AttendanceCharts({ subjects, overallPercentage }: AttendanceChartsProps) {
-  const chartData = subjects.map((s) => ({
-    name: s.code || s.name.slice(0, 10),
-    fullName: s.name,
-    percentage: s.percentage,
-    target: s.targetPercentage,
-    fill: s.color,
-  }));
-
-  // Dummy 4-week trend history
-  const trendData = [
-    { week: 'Week 1', percentage: Math.max(65, overallPercentage - 8) },
-    { week: 'Week 2', percentage: Math.max(70, overallPercentage - 4) },
-    { week: 'Week 3', percentage: Math.max(72, overallPercentage - 2) },
-    { week: 'Current', percentage: overallPercentage },
-  ];
-
-  return (
-    <div className="space-y-6">
-      {/* Top Metrics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="glass-card rounded-2xl p-5 border border-indigo-500/30 flex items-center gap-4">
-          <div className="p-3 rounded-xl bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">
-            <Award className="h-6 w-6" />
-          </div>
-          <div>
-            <p className="text-xs text-gray-400 font-medium">Overall Attendance</p>
-            <h3 className="text-2xl font-bold text-white">{overallPercentage}%</h3>
-          </div>
-        </div>
-
-        <div className="glass-card rounded-2xl p-5 border border-cyan-500/30 flex items-center gap-4">
-          <div className="p-3 rounded-xl bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">
-            <Target className="h-6 w-6" />
-          </div>
-          <div>
-            <p className="text-xs text-gray-400 font-medium">Active Subjects</p>
-            <h3 className="text-2xl font-bold text-white">{subjects.length} Subjects</h3>
-          </div>
-        </div>
-
-        <div className="glass-card rounded-2xl p-5 border border-emerald-500/30 flex items-center gap-4">
-          <div className="p-3 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-            <Flame className="h-6 w-6" />
-          </div>
-          <div>
-            <p className="text-xs text-gray-400 font-medium">Safe Subjects (&ge; 75%)</p>
-            <h3 className="text-2xl font-bold text-white">
-              {subjects.filter((s) => s.percentage >= s.targetPercentage).length} / {subjects.length}
-            </h3>
-          </div>
-        </div>
-      </div>
-
-      {/* Bar Chart: Subject Percentage Comparison */}
-      <div className="glass-card rounded-2xl p-6 space-y-4">
-        <div>
-          <h3 className="text-lg font-bold text-white">Subject-wise Attendance Breakdown</h3>
-          <p className="text-xs text-gray-400">Comparing live percentage against target thresholds</p>
-        </div>
-
-        <div className="h-72 w-full pt-4">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-              <XAxis dataKey="name" stroke="#9ca3af" fontSize={12} />
-              <YAxis domain={[0, 100]} stroke="#9ca3af" fontSize={12} />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: '#0b0f17',
-                  borderColor: 'rgba(255,255,255,0.1)',
-                  borderRadius: '12px',
-                  color: '#fff',
-                  fontSize: '12px',
-                }}
-              />
-              <ReferenceLine y={75} stroke="#f59e0b" strokeDasharray="4 4" label={{ value: '75% Target', fill: '#f59e0b', fontSize: 10 }} />
-              <Bar dataKey="percentage" radius={[6, 6, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-
-      {/* Line Chart: Weekly Attendance Trend */}
-      <div className="glass-card rounded-2xl p-6 space-y-4">
-        <div>
-          <h3 className="text-lg font-bold text-white">Attendance Trend History</h3>
-          <p className="text-xs text-gray-400">Semester progression over recent weeks</p>
-        </div>
-
-        <div className="h-60 w-full pt-4">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={trendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-              <XAxis dataKey="week" stroke="#9ca3af" fontSize={12} />
-              <YAxis domain={[50, 100]} stroke="#9ca3af" fontSize={12} />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: '#0b0f17',
-                  borderColor: 'rgba(255,255,255,0.1)',
-                  borderRadius: '12px',
-                  color: '#fff',
-                }}
-              />
-              <Line type="monotone" dataKey="percentage" stroke="#06b6d4" strokeWidth={3} dot={{ fill: '#06b6d4', r: 5 }} />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-    </div>
-  );
+function Metric({ icon, label, value, tone }: { icon: React.ReactNode; label: string; value: string; tone: 'indigo' | 'cyan' | 'emerald' }) {
+  const classes = { indigo: 'bg-indigo-500/20 text-indigo-400 border-indigo-500/30', cyan: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30', emerald: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' }[tone];
+  return <div className="glass-card rounded-2xl p-5 border border-white/10 flex items-center gap-4"><div className={`p-3 rounded-xl border ${classes}`}>{icon}</div><div><p className="text-xs text-gray-400 font-medium">{label}</p><h3 className="text-2xl font-bold text-white">{value}</h3></div></div>;
 }

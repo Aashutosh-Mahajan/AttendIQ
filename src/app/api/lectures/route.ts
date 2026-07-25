@@ -2,11 +2,12 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { generateLecturesForUser } from '@/lib/generator';
 import { startOfDay, endOfDay } from 'date-fns';
+import { getAuthenticatedUser } from '@/lib/auth';
 
 export async function GET(req: Request) {
   try {
-    const user = await prisma.user.findFirst();
-    if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    const user = await getAuthenticatedUser();
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const { searchParams } = new URL(req.url);
     const startStr = searchParams.get('startDate');
@@ -40,6 +41,8 @@ export async function GET(req: Request) {
 
 export async function PATCH(req: Request) {
   try {
+    const user = await getAuthenticatedUser();
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     const body = await req.json();
     const { id, status, notes } = body;
 
@@ -47,16 +50,15 @@ export async function PATCH(req: Request) {
       return NextResponse.json({ error: 'Missing id or status' }, { status: 400 });
     }
 
-    const updated = await prisma.lectureInstance.update({
-      where: { id },
+    const updated = await prisma.lectureInstance.updateMany({
+      where: { id, userId: user.id },
       data: {
         status,
         ...(notes !== undefined && { notes }),
       },
-      include: { subject: true },
     });
-
-    return NextResponse.json(updated);
+    if (!updated.count) return NextResponse.json({ error: 'Lecture not found.' }, { status: 404 });
+    return NextResponse.json({ success: true });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
@@ -65,8 +67,8 @@ export async function PATCH(req: Request) {
 export async function POST(req: Request) {
   try {
     // Bulk attendance update for an entire day
-    const user = await prisma.user.findFirst();
-    if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    const user = await getAuthenticatedUser();
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const body = await req.json();
     const { date, status = 'HOLIDAY' } = body;

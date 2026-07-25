@@ -14,7 +14,8 @@ import {
   ShieldCheck,
   Zap,
   Menu,
-  X
+  X,
+  LogOut
 } from 'lucide-react';
 
 interface AppShellProps {
@@ -25,6 +26,7 @@ export default function AppShell({ children }: AppShellProps) {
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [semesterInfo, setSemesterInfo] = useState<{ name: string; target: number } | null>(null);
+  const [userName, setUserName] = useState('Student');
 
   useEffect(() => {
     fetch('/api/semesters')
@@ -38,7 +40,15 @@ export default function AppShell({ children }: AppShellProps) {
         }
       })
       .catch(() => {});
+    fetch('/api/auth/me').then((res) => res.ok ? res.json() : null).then((data) => { if (data?.user?.name) setUserName(data.user.name); else if (!data) window.location.assign('/login'); }).catch(() => window.location.assign('/login'));
   }, []);
+
+  const logout = async () => {
+    await fetch('/api/auth/logout', { method: 'POST' });
+    window.location.assign('/login');
+  };
+
+  if (pathname === '/login' || pathname === '/signup' || pathname === '/verify-email') return <>{children}</>;
 
   const navItems = [
     { href: '/', label: 'Weekly Dashboard', icon: Calendar },
@@ -76,6 +86,11 @@ export default function AppShell({ children }: AppShellProps) {
           <p className="text-sm font-semibold text-white truncate">
             {semesterInfo ? semesterInfo.name : 'No semester yet'}
           </p>
+        </div>
+
+        <div className="mb-5 mx-1 flex items-center justify-between gap-2 px-3">
+          <div><p className="text-[10px] text-gray-500 uppercase tracking-wider">Signed in as</p><p className="text-sm font-semibold text-white truncate">Hello, {userName}</p></div>
+          <button onClick={logout} title="Log out" className="p-2 rounded-lg bg-white/5 hover:bg-rose-500/15 text-gray-400 hover:text-rose-300"><LogOut className="h-4 w-4" /></button>
         </div>
 
         {/* Nav Links */}
