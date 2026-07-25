@@ -1,7 +1,8 @@
 import { prisma } from './prisma';
-import { addDays, startOfDay, isBefore, isAfter, getDay, format } from 'date-fns';
+import { addDays, startOfDay, getDay } from 'date-fns';
 
-export async function generateLecturesForUser(userId: string, targetDaysAhead: number = 21) {
+/** Creates the lecture instances for every recurring slot through the end of the active term. */
+export async function generateLecturesForUser(userId: string) {
   // Find active semester for user
   const activeSemester = await prisma.semester.findFirst({
     where: { userId, isActive: true },
@@ -18,19 +19,11 @@ export async function generateLecturesForUser(userId: string, targetDaysAhead: n
 
   if (!activeSemester) return { generatedCount: 0, message: 'No active semester found.' };
 
-  const today = startOfDay(new Date());
   const semStart = startOfDay(new Date(activeSemester.startDate));
   const semEnd = startOfDay(new Date(activeSemester.endDate));
 
-  // Determine date window start and end
-  let startDate = today < semStart ? semStart : today;
-  let endDate = addDays(today, targetDaysAhead);
-  if (endDate > semEnd) {
-    endDate = semEnd;
-  }
-
-  if (startDate > endDate) {
-    return { generatedCount: 0, message: 'Current date is outside active semester range.' };
+  if (semStart > semEnd) {
+    return { generatedCount: 0, message: 'The active semester has an invalid date range.' };
   }
 
   let generatedCount = 0;
@@ -48,9 +41,9 @@ export async function generateLecturesForUser(userId: string, targetDaysAhead: n
     return { generatedCount: 0, message: 'No active timetable slots found.' };
   }
 
-  // Iterate date by date
-  let currDate = new Date(startDate);
-  while (currDate <= endDate) {
+  // Iterate the full semester so a schedule never has to be entered again each week.
+  let currDate = new Date(semStart);
+  while (currDate <= semEnd) {
     const dayOfWeek = getDay(currDate); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
 
     const matchingSlots = allSlots.filter(s => s.dayOfWeek === dayOfWeek);
@@ -88,6 +81,6 @@ export async function generateLecturesForUser(userId: string, targetDaysAhead: n
 
   return {
     generatedCount,
-    message: `Auto-generated ${generatedCount} upcoming lectures.`
+    message: `Generated ${generatedCount} lectures for the active semester.`
   };
 }
