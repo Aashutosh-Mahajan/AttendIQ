@@ -64,14 +64,16 @@ export default function AppShell({ children }: AppShellProps) {
       <aside className="hidden md:flex flex-col w-64 glass-nav border-r border-white/10 px-5 py-6 fixed inset-y-0 z-30">
         {/* Brand Header */}
         <div className="flex items-center gap-3 px-2 mb-8">
-          <div className="h-10 w-10 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-cyan-400 flex items-center justify-center shadow-lg shadow-indigo-500/25 ring-1 ring-white/20">
-            <Zap className="h-5 w-5 text-white stroke-[2.5]" />
-          </div>
+          <img
+            src="/logo.jpg"
+            alt="AttendIQ Logo"
+            className="h-10 w-10 rounded-xl object-cover ring-1 ring-white/20 shadow-lg shadow-cyan-500/20 bg-white"
+          />
           <div>
             <h1 className="font-bold text-xl tracking-tight text-white flex items-center gap-1.5">
               Attend<span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-cyan-400">IQ</span>
             </h1>
-            <p className="text-[11px] font-medium text-gray-400">Smart Attendance Tracker</p>
+            <p className="text-[11px] font-medium text-gray-400">Track Today, Stay Ahead</p>
           </div>
         </div>
 
@@ -132,9 +134,11 @@ export default function AppShell({ children }: AppShellProps) {
       {/* Mobile Top Header */}
       <header className="md:hidden fixed top-0 left-0 right-0 h-16 glass-nav z-40 px-4 flex items-center justify-between border-b border-white/10">
         <div className="flex items-center gap-2.5">
-          <div className="h-8 w-8 rounded-lg bg-gradient-to-tr from-indigo-600 to-cyan-400 flex items-center justify-center shadow-md">
-            <Zap className="h-4 w-4 text-white stroke-[2.5]" />
-          </div>
+          <img
+            src="/logo.jpg"
+            alt="AttendIQ Logo"
+            className="h-8 w-8 rounded-lg object-cover bg-white"
+          />
           <span className="font-bold text-lg text-white">AttendIQ</span>
         </div>
         <button

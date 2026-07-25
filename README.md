@@ -1,8 +1,11 @@
 <div align="center">
 
+<img src="public/logo.jpg" alt="AttendIQ Logo" width="160" style="border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.3);" />
+
 # ⚡ AttendIQ
 
 ### **Smart College Attendance Tracker**
+*Track Today, Stay Ahead*
 
 *Automated lecture scheduling, live attendance analytics, and intelligent safe skip & recovery recommendations.*
 

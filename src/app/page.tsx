@@ -38,9 +38,11 @@ export default function Home() {
         <div className="max-w-lg w-full text-center space-y-8">
           {/* Logo & Welcome */}
           <div className="space-y-4">
-            <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-indigo-600 to-cyan-500 flex items-center justify-center mx-auto shadow-xl shadow-indigo-600/30">
-              <Zap className="h-8 w-8 text-white" />
-            </div>
+            <img
+              src="/logo.jpg"
+              alt="AttendIQ Logo"
+              className="h-20 w-20 rounded-2xl object-cover mx-auto shadow-2xl shadow-indigo-600/30 ring-2 ring-white/10 bg-white"
+            />
             <div>
               <h1 className="text-2xl font-bold text-white">
                 Welcome to Attend<span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-cyan-400">IQ</span>
