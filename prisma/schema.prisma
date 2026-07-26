@@ -1,50 +1,22 @@
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 generator client {
   provider = "prisma-client-js"
 }
 
-model User {
-  id               String            @id @default(uuid())
-  email            String            @unique
-  name             String?
-  password         String
-  emailVerified    DateTime?
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
-  semesters        Semester[]
-  subjects         Subject[]
-  timetableSlots   TimetableSlot[]
-  lectureInstances LectureInstance[]
-  sessions         Session[]
-  verificationCodes VerificationCode[]
-}
-
-model Session {
-  id        String   @id @default(uuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tokenHash String   @unique
-  expiresAt DateTime
-  createdAt DateTime @default(now())
-}
-
-model VerificationCode {
-  id        String   @id @default(uuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  codeHash  String
-  expiresAt DateTime
-  createdAt DateTime @default(now())
-}
+// ─────────────────────────────────────────────────────────────────────────────
+// NOTE: User authentication is handled by Supabase Auth.
+// Users are stored in Supabase's auth.users table — not here.
+// All business models reference userId as a plain String (UUID from auth.users).
+// ─────────────────────────────────────────────────────────────────────────────
 
 model Semester {
   id               String            @id @default(uuid())
-  userId           String
-  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId           String            // references auth.users.id
   name             String
   startDate        DateTime
   endDate          DateTime
@@ -52,12 +24,13 @@ model Semester {
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
   subjects         Subject[]
+
+  @@index([userId])
 }
 
 model Subject {
   id               String            @id @default(uuid())
-  userId           String
-  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId           String            // references auth.users.id
   semesterId       String
   semester         Semester          @relation(fields: [semesterId], references: [id], onDelete: Cascade)
   name             String
@@ -68,15 +41,16 @@ model Subject {
   updatedAt        DateTime          @updatedAt
   timetableSlots   TimetableSlot[]
   lectureInstances LectureInstance[]
+
+  @@index([userId])
 }
 
 model TimetableSlot {
   id               String            @id @default(uuid())
-  userId           String
-  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId           String            // references auth.users.id
   subjectId        String
   subject          Subject           @relation(fields: [subjectId], references: [id], onDelete: Cascade)
-  dayOfWeek        Int               // 1 = Monday, 2 = Tuesday, ..., 6 = Saturday, 0 = Sunday
+  dayOfWeek        Int               // 1 = Monday … 6 = Saturday, 0 = Sunday
   startTime        String            // "09:00"
   endTime          String            // "10:00"
   room             String?
@@ -84,12 +58,13 @@ model TimetableSlot {
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
   lectureInstances LectureInstance[]
+
+  @@index([userId])
 }
 
 model LectureInstance {
   id               String         @id @default(uuid())
-  userId           String
-  user             User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId           String         // references auth.users.id
   subjectId        String
   subject          Subject        @relation(fields: [subjectId], references: [id], onDelete: Cascade)
   timetableSlotId  String?
@@ -103,4 +78,5 @@ model LectureInstance {
   updatedAt        DateTime       @updatedAt
 
   @@unique([subjectId, date, startTime], name: "subject_date_time_unique")
+  @@index([userId])
 }

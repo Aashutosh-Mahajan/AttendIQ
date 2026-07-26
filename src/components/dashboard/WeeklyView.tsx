@@ -194,6 +194,8 @@ export default function WeeklyView() {
           bunkable: totalBunkable,
           mustAttend: totalMustAttend,
         });
+      } else {
+        setOverallHealth({ percentage: 100, bunkable: 0, mustAttend: 0 });
       }
     } catch {}
   };
@@ -208,11 +210,12 @@ export default function WeeklyView() {
       prev.map((lec) => (lec.id === id ? { ...lec, status: nextStatus } : lec))
     );
     try {
-      await fetch('/api/lectures', {
+      const response = await fetch('/api/lectures', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id, status: nextStatus }),
       });
+      if (!response.ok) throw new Error('Unable to update attendance.');
       fetchOverallHealth();
     } catch {
       fetchLectures();
@@ -227,11 +230,12 @@ export default function WeeklyView() {
       )
     );
     try {
-      await fetch('/api/lectures', {
+      const response = await fetch('/api/lectures', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ date: formatted, status }),
       });
+      if (!response.ok) throw new Error('Unable to update attendance.');
       fetchOverallHealth();
     } catch {
       fetchLectures();

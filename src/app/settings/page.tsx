@@ -1,42 +1,45 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Bell, Check, LockKeyhole, Settings, UserRound, Loader2, KeyRound, Eye, EyeOff } from 'lucide-react';
+import { Bell, Check, LockKeyhole, Settings, UserRound, Loader2, KeyRound, Eye, EyeOff, Mail, ShieldCheck } from 'lucide-react';
+import { createSupabaseBrowserClient } from '@/lib/auth/client';
+
+type PasswordStep = 'idle' | 'otp_sent' | 'set_password';
 
 export default function SettingsPage() {
+  const supabase = createSupabaseBrowserClient();
+
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [reminders, setReminders] = useState(true);
   const [compactView, setCompactView] = useState(false);
-  
+
   const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  // Password change state
-  const [passwordMode, setPasswordMode] = useState<'idle' | 'requesting' | 'entering'>('idle');
-  const [passwordCode, setPasswordCode] = useState('');
+  // Password change — 3 steps: idle → otp_sent → set_password
+  const [passwordStep, setPasswordStep] = useState<PasswordStep>('idle');
+  const [otp, setOtp] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [passwordLoading, setPasswordLoading] = useState(false);
   const [passwordError, setPasswordError] = useState('');
   const [passwordSuccess, setPasswordSuccess] = useState('');
+  const [resendCooldown, setResendCooldown] = useState(0);
 
-  // Load real profile from API + local preferences from localStorage
   useEffect(() => {
     const loadSettings = async () => {
       try {
-        const res = await fetch('/api/auth/me');
-        if (res.ok) {
-          const data = await res.json();
-          setName(data.user.name || '');
-          setEmail(data.user.email || '');
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          setName(user.user_metadata?.name ?? user.user_metadata?.full_name ?? '');
+          setEmail(user.email ?? '');
         }
-      } catch {
-        // Middleware handles redirect
-      }
+      } catch { /* middleware handles redirect */ }
 
-      // Load UI preferences from localStorage
       try {
         const stored = window.localStorage.getItem('attendiq-prefs');
         if (stored) {
@@ -44,42 +47,30 @@ export default function SettingsPage() {
           setReminders(prefs.reminders ?? true);
           setCompactView(prefs.compactView ?? false);
         }
-      } catch {
-        // Ignore parse errors
-      }
+      } catch { /* ignore */ }
 
       setLoading(false);
     };
-
     loadSettings();
   }, []);
+
+  // Resend cooldown countdown
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const t = setTimeout(() => setResendCooldown((c) => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [resendCooldown]);
 
   const saveSettings = async (event: React.FormEvent) => {
     event.preventDefault();
     setSaving(true);
     setError('');
-
     try {
-      // Save profile name to the database
-      const res = await fetch('/api/settings', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name.trim() }),
+      const { error: authError } = await supabase.auth.updateUser({
+        data: { name: name.trim() || undefined },
       });
-
-      if (!res.ok) {
-        const data = await res.json();
-        setError(data.error || 'Failed to save.');
-        setSaving(false);
-        return;
-      }
-
-      // Save UI preferences to localStorage
-      window.localStorage.setItem(
-        'attendiq-prefs',
-        JSON.stringify({ reminders, compactView })
-      );
-
+      if (authError) { setError(authError.message || 'Failed to save.'); setSaving(false); return; }
+      window.localStorage.setItem('attendiq-prefs', JSON.stringify({ reminders, compactView }));
       setSaved(true);
       setSaving(false);
       setTimeout(() => setSaved(false), 2500);
@@ -89,56 +80,83 @@ export default function SettingsPage() {
     }
   };
 
-  const requestPasswordReset = async () => {
-    setPasswordMode('requesting');
+  // Step 1 — Send OTP to user's email via resetPasswordForEmail
+  const sendPasswordOtp = async () => {
+    if (!email) return;
     setPasswordError('');
-    setPasswordSuccess('');
-    
+    setPasswordLoading(true);
     try {
-      const res = await fetch('/api/settings/password/request', { method: 'POST' });
-      if (!res.ok) {
-        const data = await res.json();
-        setPasswordError(data.error || 'Failed to send code.');
-        setPasswordMode('idle');
-        return;
-      }
-      
-      setPasswordMode('entering');
-    } catch {
-      setPasswordError('Network error. Please try again.');
-      setPasswordMode('idle');
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+      if (error) { setPasswordError(error.message || 'Failed to send verification email.'); return; }
+      setPasswordStep('otp_sent');
+      setResendCooldown(60);
+    } finally {
+      setPasswordLoading(false);
     }
   };
 
-  const submitPasswordChange = async (event: React.FormEvent) => {
+  // Resend OTP
+  const resendOtp = async () => {
+    if (resendCooldown > 0 || !email) return;
+    setPasswordError('');
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    if (error) { setPasswordError(error.message || 'Failed to resend.'); return; }
+    setResendCooldown(60);
+  };
+
+  // Step 2 — Verify OTP (type: 'recovery')
+  const verifyOtp = async (event: React.FormEvent) => {
     event.preventDefault();
     setPasswordError('');
-    
-    if (newPassword.length < 8) {
-      return setPasswordError('Password must be at least 8 characters long.');
-    }
-
+    setPasswordLoading(true);
     try {
-      const res = await fetch('/api/settings/password/update', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: passwordCode, newPassword }),
+      const { error } = await supabase.auth.verifyOtp({
+        email,
+        token: otp,
+        type: 'recovery',
       });
-
-      if (!res.ok) {
-        const data = await res.json();
-        return setPasswordError(data.error || 'Failed to update password.');
-      }
-
-      setPasswordSuccess('Password updated successfully.');
-      setPasswordMode('idle');
-      setPasswordCode('');
-      setNewPassword('');
-      setTimeout(() => setPasswordSuccess(''), 3000);
-    } catch {
-      setPasswordError('Network error. Please try again.');
+      if (error) { setPasswordError(error.message || 'Invalid or expired code.'); return; }
+      // OTP verified — move to password entry
+      setPasswordStep('set_password');
+    } finally {
+      setPasswordLoading(false);
     }
   };
+
+  // Step 3 — Set new password
+  const submitNewPassword = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setPasswordError('');
+    if (newPassword.length < 8) { setPasswordError('Password must be at least 8 characters.'); return; }
+    if (newPassword !== confirmPassword) { setPasswordError('Passwords do not match.'); return; }
+    setPasswordLoading(true);
+    try {
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) { setPasswordError(error.message || 'Failed to update password.'); return; }
+      setPasswordSuccess('Password updated successfully.');
+      resetPasswordState();
+      setTimeout(() => setPasswordSuccess(''), 4000);
+    } finally {
+      setPasswordLoading(false);
+    }
+  };
+
+  const resetPasswordState = () => {
+    setPasswordStep('idle');
+    setOtp('');
+    setNewPassword('');
+    setConfirmPassword('');
+    setPasswordError('');
+    setShowPassword(false);
+  };
+
+  const maskedEmail = email
+    ? email.replace(/^(.{2})(.*)(@.*)$/, (_m, s, mid, d) => s + '*'.repeat(Math.min(mid.length, 5)) + d)
+    : '';
 
   if (loading) {
     return (
@@ -162,9 +180,8 @@ export default function SettingsPage() {
       </div>
 
       <div className="space-y-6">
-        {/* Profile & Preferences Form */}
+        {/* Profile & Preferences */}
         <form onSubmit={saveSettings} className="space-y-6">
-          {/* Profile Section */}
           <section className="glass-card p-6 rounded-2xl border border-white/10 space-y-5">
             <div className="flex items-center gap-2">
               <UserRound className="h-4 w-4 text-cyan-400" />
@@ -193,7 +210,6 @@ export default function SettingsPage() {
             </div>
           </section>
 
-          {/* Preferences Section */}
           <section className="glass-card p-6 rounded-2xl border border-white/10 space-y-4">
             <div className="flex items-center gap-2">
               <Bell className="h-4 w-4 text-cyan-400" />
@@ -204,144 +220,183 @@ export default function SettingsPage() {
                 <p className="text-sm font-medium text-white">Attendance reminders</p>
                 <p className="text-xs text-gray-500 mt-0.5">Keep the weekly attendance checklist visible.</p>
               </div>
-              <input
-                type="checkbox"
-                checked={reminders}
-                onChange={(e) => setReminders(e.target.checked)}
-                className="h-4 w-4 accent-indigo-500"
-              />
+              <input type="checkbox" checked={reminders} onChange={(e) => setReminders(e.target.checked)} className="h-4 w-4 accent-indigo-500" />
             </label>
             <label className="flex items-center justify-between gap-4 p-3 rounded-xl bg-white/[0.03] border border-white/5 cursor-pointer">
               <div>
                 <p className="text-sm font-medium text-white">Compact timetable cards</p>
                 <p className="text-xs text-gray-500 mt-0.5">Use denser cards for busy weekly schedules.</p>
               </div>
-              <input
-                type="checkbox"
-                checked={compactView}
-                onChange={(e) => setCompactView(e.target.checked)}
-                className="h-4 w-4 accent-indigo-500"
-              />
+              <input type="checkbox" checked={compactView} onChange={(e) => setCompactView(e.target.checked)} className="h-4 w-4 accent-indigo-500" />
             </label>
           </section>
 
-          {/* Info Note */}
           <section className="glass-card p-5 rounded-2xl border border-white/10 flex gap-3 text-xs text-gray-400">
             <LockKeyhole className="h-4 w-4 text-indigo-300 shrink-0" />
             <p>Semester dates and recurring lectures are managed in the Timetable Builder, so Settings stays focused on your account and preferences.</p>
           </section>
 
-          {/* Error */}
-          {error && (
-            <p className="p-3 rounded-xl bg-rose-500/20 text-rose-300 text-xs">{error}</p>
-          )}
+          {error && <p className="p-3 rounded-xl bg-rose-500/20 text-rose-300 text-xs">{error}</p>}
 
-          {/* Save Button */}
           <button
             disabled={saving}
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-60 text-white font-medium text-xs shadow-md shadow-indigo-600/30 transition-colors"
           >
-            {saving ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : saved ? (
-              <Check className="h-4 w-4" />
-            ) : null}
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : saved ? <Check className="h-4 w-4" /> : null}
             {saving ? 'Saving…' : saved ? 'Saved!' : 'Save settings'}
           </button>
         </form>
 
-        {/* Password Management Section */}
+        {/* ── Security / Change Password ── */}
         <section className="glass-card p-6 rounded-2xl border border-white/10 space-y-5">
           <div className="flex items-center gap-2">
             <KeyRound className="h-4 w-4 text-cyan-400" />
             <h3 className="font-bold text-white">Security</h3>
           </div>
-          
-          <div className="text-sm">
-            <p className="text-gray-400 mb-4">Change your account password securely using a verification code sent to your email.</p>
-            
-            {passwordSuccess && (
-              <p className="mb-4 p-3 rounded-xl bg-emerald-500/20 text-emerald-400 text-xs flex items-center gap-2">
-                <Check className="h-4 w-4" />
-                {passwordSuccess}
+
+          {/* Success banner */}
+          {passwordSuccess && (
+            <div className="flex items-center gap-2 p-3 rounded-xl bg-emerald-500/15 border border-emerald-500/25 text-emerald-400 text-xs">
+              <ShieldCheck className="h-4 w-4 shrink-0" />
+              {passwordSuccess}
+            </div>
+          )}
+
+          {/* Error banner */}
+          {passwordError && (
+            <p className="p-3 rounded-xl bg-rose-500/20 text-rose-300 text-xs">{passwordError}</p>
+          )}
+
+          {/* ── IDLE ── */}
+          {passwordStep === 'idle' && (
+            <div className="space-y-3">
+              <p className="text-sm text-gray-400">
+                To change your password we'll send a verification code to{' '}
+                <span className="text-white font-medium">{maskedEmail}</span>.
               </p>
-            )}
-
-            {passwordError && (
-              <p className="mb-4 p-3 rounded-xl bg-rose-500/20 text-rose-300 text-xs">{passwordError}</p>
-            )}
-
-            {passwordMode === 'idle' && (
               <button
-                onClick={requestPasswordReset}
-                className="px-4 py-2.5 rounded-xl bg-white/[0.05] hover:bg-white/[0.08] border border-white/10 text-white font-medium text-xs transition-colors"
+                onClick={sendPasswordOtp}
+                disabled={passwordLoading}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/[0.05] hover:bg-white/[0.08] border border-white/10 text-white font-medium text-xs transition-colors disabled:opacity-50"
               >
-                Change password
+                {passwordLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
+                {passwordLoading ? 'Sending…' : 'Send verification code'}
               </button>
-            )}
+            </div>
+          )}
 
-            {passwordMode === 'requesting' && (
-              <button disabled className="px-4 py-2.5 rounded-xl bg-white/[0.05] border border-white/10 text-white font-medium text-xs flex items-center gap-2 opacity-70">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Sending code…
-              </button>
-            )}
+          {/* ── OTP SENT — enter code ── */}
+          {passwordStep === 'otp_sent' && (
+            <form onSubmit={verifyOtp} className="space-y-4 max-w-sm">
+              <div className="flex items-center gap-2 p-3 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-xs text-indigo-300">
+                <Mail className="h-4 w-4 shrink-0" />
+                <span>A 6-digit code was sent to <strong>{maskedEmail}</strong>. Check your inbox.</span>
+              </div>
 
-            {passwordMode === 'entering' && (
-              <form onSubmit={submitPasswordChange} className="space-y-4 max-w-sm">
-                <p className="text-xs text-indigo-300">We sent a 6-digit code to your email.</p>
-                <div>
-                  <input
-                    required
-                    inputMode="numeric"
-                    maxLength={6}
-                    placeholder="6-digit code"
-                    value={passwordCode}
-                    onChange={(e) => setPasswordCode(e.target.value.replace(/\D/g, ''))}
-                    className="w-full p-2.5 rounded-xl bg-[#0b0f17] border border-white/10 text-white tracking-widest text-center focus:outline-none focus:border-indigo-500"
-                  />
-                </div>
-                <div className="relative">
-                  <input
-                    required
-                    type={showPassword ? 'text' : 'password'}
-                    minLength={8}
-                    placeholder="New password"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    className="w-full p-2.5 pr-10 rounded-xl bg-[#0b0f17] border border-white/10 text-white focus:outline-none focus:border-indigo-500"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-2.5 text-gray-400 hover:text-white"
-                  >
-                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </button>
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    type="submit"
-                    className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-xs shadow-md shadow-indigo-600/30 transition-colors"
-                  >
-                    Update password
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setPasswordMode('idle');
-                      setPasswordCode('');
-                      setNewPassword('');
-                      setPasswordError('');
-                    }}
-                    className="px-4 py-2 rounded-xl bg-white/[0.05] hover:bg-white/[0.08] text-white font-medium text-xs transition-colors"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </form>
-            )}
-          </div>
+              <div>
+                <label className="block text-xs text-gray-400 mb-1.5">Verification code</label>
+                <input
+                  required
+                  inputMode="numeric"
+                  maxLength={6}
+                  placeholder="_ _ _ _ _ _"
+                  value={otp}
+                  onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
+                  autoFocus
+                  className="w-full p-3 rounded-xl bg-[#0b0f17] border border-indigo-500/40 text-white placeholder-gray-700 tracking-[0.6em] text-center text-xl font-bold focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+
+              <div className="flex gap-2">
+                <button
+                  type="submit"
+                  disabled={passwordLoading || otp.length < 6}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-medium text-xs transition-colors"
+                >
+                  {passwordLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                  {passwordLoading ? 'Verifying…' : 'Verify code'}
+                </button>
+                <button
+                  type="button"
+                  onClick={resetPasswordState}
+                  className="px-4 py-2 rounded-xl bg-white/[0.05] hover:bg-white/[0.08] text-white font-medium text-xs transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+
+              <p className="text-xs text-gray-500">
+                Didn&apos;t receive it?{' '}
+                <button
+                  type="button"
+                  onClick={resendOtp}
+                  disabled={resendCooldown > 0}
+                  className="text-indigo-400 hover:text-indigo-300 disabled:opacity-40 underline-offset-2 hover:underline"
+                >
+                  {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend code'}
+                </button>
+              </p>
+            </form>
+          )}
+
+          {/* ── SET PASSWORD — after OTP verified ── */}
+          {passwordStep === 'set_password' && (
+            <form onSubmit={submitNewPassword} className="space-y-4 max-w-sm">
+              <div className="flex items-center gap-2 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-300">
+                <ShieldCheck className="h-4 w-4 shrink-0" />
+                <span>Identity verified. Choose a new password.</span>
+              </div>
+
+              <div className="relative">
+                <input
+                  required
+                  type={showPassword ? 'text' : 'password'}
+                  minLength={8}
+                  placeholder="New password (8+ characters)"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  autoFocus
+                  className="w-full p-2.5 pr-10 rounded-xl bg-[#0b0f17] border border-white/10 text-white focus:outline-none focus:border-indigo-500 text-sm"
+                />
+                <button
+                  suppressHydrationWarning
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-2.5 text-gray-400 hover:text-white"
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+
+              <input
+                required
+                type={showPassword ? 'text' : 'password'}
+                minLength={8}
+                placeholder="Confirm new password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                className="w-full p-2.5 rounded-xl bg-[#0b0f17] border border-white/10 text-white focus:outline-none focus:border-indigo-500 text-sm"
+              />
+
+              <div className="flex gap-2">
+                <button
+                  type="submit"
+                  disabled={passwordLoading}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-medium text-xs shadow-md shadow-indigo-600/30 transition-colors"
+                >
+                  {passwordLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                  {passwordLoading ? 'Updating…' : 'Update password'}
+                </button>
+                <button
+                  type="button"
+                  onClick={resetPasswordState}
+                  className="px-4 py-2 rounded-xl bg-white/[0.05] hover:bg-white/[0.08] text-white font-medium text-xs transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          )}
         </section>
       </div>
     </div>

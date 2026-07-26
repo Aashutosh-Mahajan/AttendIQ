@@ -3,20 +3,19 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { 
-  Calendar, 
-  BarChart3, 
-  Clock, 
-  Settings, 
-  Sparkles, 
-  BookOpen, 
+import {
+  Calendar,
+  BarChart3,
+  Clock,
+  Settings,
+  BookOpen,
   ChevronRight,
   ShieldCheck,
-  Zap,
   Menu,
   X,
   LogOut
 } from 'lucide-react';
+import { createSupabaseBrowserClient } from '@/lib/auth/client';
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -24,46 +23,52 @@ interface AppShellProps {
 
 export default function AppShell({ children }: AppShellProps) {
   const pathname = usePathname();
+  const supabase = createSupabaseBrowserClient();
+
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [semesterInfo, setSemesterInfo] = useState<{ name: string; target: number } | null>(null);
+  const [semesterInfo, setSemesterInfo] = useState<{ name: string } | null>(null);
   const [userName, setUserName] = useState('Student');
   const [authReady, setAuthReady] = useState(false);
 
-  const isAuthPage = pathname === '/login' || pathname === '/signup' || pathname === '/verify-email';
+  const isAuthPage = ['/login', '/signup', '/verify-email', '/forgot-password', '/reset-password'].some(
+    (p) => pathname === p
+  );
 
   useEffect(() => {
-    // Skip API calls on auth pages — middleware handles redirects
     if (isAuthPage) { setAuthReady(true); return; }
 
-    // Fetch semester info and auth in parallel
     const semesterPromise = fetch('/api/semesters')
-      .then((res) => res.ok ? res.json() : null)
+      .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (data?.activeSemester) {
-          setSemesterInfo({ name: data.activeSemester.name, target: 75 });
+          setSemesterInfo({ name: data.activeSemester.name });
         }
       })
       .catch(() => {});
 
-    const authPromise = fetch('/api/auth/me')
-      .then((res) => res.ok ? res.json() : null)
-      .then((data) => {
-        if (data?.user?.name) setUserName(data.user.name);
-        else if (!data) window.location.assign('/login');
-      })
-      .catch(() => window.location.assign('/login'));
+    const authPromise = supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) {
+        const displayName =
+          user.user_metadata?.name ||
+          user.user_metadata?.full_name ||
+          user.email?.split('@')[0] ||
+          'Student';
+        setUserName(displayName);
+      } else {
+        window.location.assign('/login');
+      }
+    }).catch(() => window.location.assign('/login'));
 
     Promise.allSettled([semesterPromise, authPromise]).then(() => setAuthReady(true));
   }, [pathname, isAuthPage]);
 
   const logout = async () => {
-    await fetch('/api/auth/logout', { method: 'POST' });
+    await supabase.auth.signOut();
     window.location.assign('/login');
   };
 
   if (isAuthPage) return <>{children}</>;
 
-  // Show loading spinner while auth is being verified — prevents dashboard flash
   if (!authReady) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#0b0f17]">
@@ -116,8 +121,17 @@ export default function AppShell({ children }: AppShellProps) {
         </div>
 
         <div className="mb-5 mx-1 flex items-center justify-between gap-2 px-3">
-          <div><p className="text-[10px] text-gray-500 uppercase tracking-wider">Signed in as</p><p className="text-sm font-semibold text-white truncate">Hello, {userName}</p></div>
-          <button onClick={logout} title="Log out" className="p-2 rounded-lg bg-white/5 hover:bg-rose-500/15 text-gray-400 hover:text-rose-300"><LogOut className="h-4 w-4" /></button>
+          <div>
+            <p className="text-[10px] text-gray-500 uppercase tracking-wider">Signed in as</p>
+            <p className="text-sm font-semibold text-white truncate">Hello, {userName}</p>
+          </div>
+          <button
+            onClick={logout}
+            title="Log out"
+            className="p-2 rounded-lg bg-white/5 hover:bg-rose-500/15 text-gray-400 hover:text-rose-300"
+          >
+            <LogOut className="h-4 w-4" />
+          </button>
         </div>
 
         {/* Nav Links */}
@@ -125,7 +139,6 @@ export default function AppShell({ children }: AppShellProps) {
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = pathname === item.href;
-
             return (
               <Link
                 key={item.href}
@@ -146,7 +159,7 @@ export default function AppShell({ children }: AppShellProps) {
           })}
         </nav>
 
-        {/* Footer info */}
+        {/* Footer */}
         <div className="pt-4 mt-auto border-t border-white/10 text-xs text-gray-400 flex items-center justify-between px-2">
           <span className="flex items-center gap-1.5 text-emerald-400 font-medium">
             <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>
@@ -159,11 +172,7 @@ export default function AppShell({ children }: AppShellProps) {
       {/* Mobile Top Header */}
       <header className="md:hidden fixed top-0 left-0 right-0 h-16 glass-nav z-40 px-4 flex items-center justify-between border-b border-white/10">
         <div className="flex items-center gap-2.5">
-          <img
-            src="/logo.jpg"
-            alt="AttendIQ Logo"
-            className="h-8 w-8 rounded-lg object-cover bg-white"
-          />
+          <img src="/logo.jpg" alt="AttendIQ Logo" className="h-8 w-8 rounded-lg object-cover bg-white" />
           <span className="font-bold text-lg text-white">AttendIQ</span>
         </div>
         <button
@@ -194,10 +203,17 @@ export default function AppShell({ children }: AppShellProps) {
               </Link>
             );
           })}
+          <button
+            onClick={logout}
+            className="flex items-center gap-3 px-4 py-3 rounded-xl text-base font-medium text-rose-400 hover:bg-rose-500/10 w-full"
+          >
+            <LogOut className="h-5 w-5" />
+            <span>Sign out</span>
+          </button>
         </div>
       )}
 
-      {/* Main Content Viewport */}
+      {/* Main Content */}
       <main className="flex-1 md:pl-64 pt-16 md:pt-0 min-h-screen">
         <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
           {children}

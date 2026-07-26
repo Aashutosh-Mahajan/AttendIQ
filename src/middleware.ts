@@ -1,41 +1,79 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createServerClient } from '@supabase/ssr';
 
-const AUTH_COOKIE = process.env.AUTH_COOKIE_NAME || 'attendiq_session';
+/** Routes that are always public — no auth redirect in either direction */
+const ALWAYS_PUBLIC = ['/verify-email'];
 
-/** Pages that should only be shown to unauthenticated users */
-const GUEST_ONLY = ['/login', '/signup', '/verify-email'];
+/** Routes that redirect to dashboard if already authenticated */
+const GUEST_ONLY = ['/login', '/signup', '/forgot-password', '/reset-password'];
 
-/** Paths that should be excluded from auth checks entirely */
-const PUBLIC_PREFIXES = ['/api/', '/_next/', '/favicon', '/logo'];
+/** Routes that don't need any auth check */
+const PUBLIC_PREFIXES = ['/api/auth/callback'];
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Skip public/static/API paths
+  // Allow Supabase auth callback and static assets through
   if (PUBLIC_PREFIXES.some((p) => pathname.startsWith(p))) {
     return NextResponse.next();
   }
 
-  const hasSession = request.cookies.has(AUTH_COOKIE);
-  const isGuestPage = GUEST_ONLY.some((p) => pathname === p);
+  // We need to create a response first so we can mutate cookies
+  let response = NextResponse.next({ request });
 
-  // Unauthenticated user trying to access a protected page → redirect to login
-  if (!hasSession && !isGuestPage) {
-    const loginUrl = request.nextUrl.clone();
-    loginUrl.pathname = '/login';
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll();
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value }) =>
+            request.cookies.set(name, value)
+          );
+          response = NextResponse.next({ request });
+          cookiesToSet.forEach(({ name, value, options }) =>
+            response.cookies.set(name, value, options)
+          );
+        },
+      },
+    }
+  );
+
+  // Refresh session if expired — required for Server Components to stay in sync
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  // Always-public routes — let through regardless of auth state
+  if (ALWAYS_PUBLIC.some((p) => pathname === p || pathname.startsWith(p + '/'))) {
+    return response;
+  }
+
+  const isGuestOnly = GUEST_ONLY.some((p) => pathname === p || pathname.startsWith(p + '/'));
+
+  if (isGuestOnly) {
+    // Already signed in → redirect to dashboard
+    if (user) {
+      return NextResponse.redirect(new URL('/', request.url));
+    }
+    return response;
+  }
+
+  // Protected route — no session → redirect to login
+  if (!user) {
+    const loginUrl = new URL('/login', request.url);
+    loginUrl.searchParams.set('next', pathname);
     return NextResponse.redirect(loginUrl);
   }
 
-  // Authenticated user trying to access login/signup → redirect to dashboard
-  if (hasSession && isGuestPage) {
-    const dashUrl = request.nextUrl.clone();
-    dashUrl.pathname = '/';
-    return NextResponse.redirect(dashUrl);
-  }
-
-  return NextResponse.next();
+  return response;
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)'],
+  matcher: [
+    '/((?!_next/static|_next/image|favicon.ico|api/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)',
+  ],
 };

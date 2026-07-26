@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { calculateAttendance } from '@/lib/calculator';
-import { getAuthenticatedUser } from '@/lib/auth';
+import { getUser } from '@/lib/getUser';
 
 export async function GET() {
   try {
-    const user = await getAuthenticatedUser();
+    const user = await getUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const activeSemester = await prisma.semester.findFirst({
@@ -40,7 +40,7 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
-    const user = await getAuthenticatedUser();
+    const user = await getUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const body = await req.json();
@@ -62,6 +62,9 @@ export async function POST(req: Request) {
       });
       if (!activeSem) return NextResponse.json({ error: 'No active semester found' }, { status: 400 });
       targetSemesterId = activeSem.id;
+    } else {
+      const targetSemester = await prisma.semester.findFirst({ where: { id: targetSemesterId, userId: user.id } });
+      if (!targetSemester) return NextResponse.json({ error: 'Semester not found.' }, { status: 404 });
     }
 
     const duplicate = await prisma.subject.findFirst({
@@ -88,7 +91,7 @@ export async function POST(req: Request) {
 
 export async function PUT(req: Request) {
   try {
-    const user = await getAuthenticatedUser();
+    const user = await getUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     const body = await req.json();
     const { id, name, code, color, targetPercentage } = body;
@@ -116,7 +119,7 @@ export async function PUT(req: Request) {
 
 export async function DELETE(req: Request) {
   try {
-    const user = await getAuthenticatedUser();
+    const user = await getUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');

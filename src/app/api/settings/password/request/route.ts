@@ -1,30 +1,23 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
-import { getAuthenticatedUser, hashToken } from '@/lib/auth';
-import { sendPasswordResetCode } from '@/lib/email';
-import crypto from 'crypto';
+import { getUser } from '@/lib/getUser';
+import { createSupabaseServerClient } from '@/lib/auth/server';
 
+/**
+ * Triggers a password-reset email for the currently signed-in user.
+ */
 export async function POST() {
   try {
-    const user = await getAuthenticatedUser();
+    const user = await getUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    // Generate 6-digit OTP
-    const code = crypto.randomInt(100000, 999999).toString();
-    const codeHash = hashToken(code);
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+    const supabase = await createSupabaseServerClient();
+    const { error } = await supabase.auth.resetPasswordForEmail(user.email!, {
+      redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/reset-password`,
+    });
+    if (error) return NextResponse.json({ error: error.message }, { status: 400 });
 
-    await prisma.$transaction([
-      prisma.verificationCode.deleteMany({ where: { userId: user.id } }),
-      prisma.verificationCode.create({
-        data: { userId: user.id, codeHash, expiresAt },
-      }),
-    ]);
-
-    await sendPasswordResetCode(user.email, code);
-
-    return NextResponse.json({ message: 'Code sent to your email.' });
-  } catch (error: any) {
+    return NextResponse.json({ message: 'Reset email sent.' });
+  } catch {
     return NextResponse.json({ error: 'Failed to process request.' }, { status: 500 });
   }
 }
