@@ -271,7 +271,7 @@ export default function SettingsPage() {
           {passwordStep === 'idle' && (
             <div className="space-y-3">
               <p className="text-sm text-gray-400">
-                To change your password we'll send a verification code to{' '}
+                To change your password we&apos;ll send a verification code to{' '}
                 <span className="text-white font-medium">{maskedEmail}</span>.
               </p>
               <button
