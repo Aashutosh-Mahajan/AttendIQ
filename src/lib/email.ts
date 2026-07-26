@@ -343,3 +343,65 @@ export async function sendWelcomeEmail(email: string, name: string = 'Student') 
     html,
   });
 }
+
+/* ═════════════════════════════════════════════
+ * EMAIL 3: Password Reset Code
+ * ═════════════════════════════════════════════ */
+export async function sendPasswordResetCode(email: string, code: string) {
+  const transporter = getTransporter();
+  if (!transporter) {
+    if (process.env.NODE_ENV !== 'production') {
+      console.info('[SMTP Disabled] Password reset code generated (check email for code)');
+    }
+    return;
+  }
+
+  const formattedCode = code.slice(0, 3) + ' ' + code.slice(3);
+
+  const body = `
+    <h2 style="margin:0 0 8px 0;font-size:22px;font-weight:800;color:${COLORS.white};text-align:center;">
+      Reset your password
+    </h2>
+    <p style="margin:0 0 28px 0;font-size:14px;color:${COLORS.textSec};text-align:center;line-height:1.6;">
+      Use the code below to securely change or reset your AttendIQ password.
+    </p>
+
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+      <tr>
+        <td style="background:linear-gradient(135deg, rgba(251,113,133,0.12), rgba(244,63,94,0.08));border:1px solid rgba(251,113,133,0.25);border-radius:16px;padding:28px 20px;text-align:center;">
+          <p class="code-text" style="margin:0;font-family:'Courier New',Courier,monospace;font-size:40px;font-weight:800;letter-spacing:10px;color:${COLORS.rose};line-height:1;">
+            ${formattedCode}
+          </p>
+          <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin-top:14px;">
+            <tr>
+              <td style="padding:5px 14px;border-radius:20px;background:rgba(251,113,133,0.12);border:1px solid rgba(251,113,133,0.2);">
+                <p style="margin:0;font-size:11px;font-weight:600;color:${COLORS.rose};">⏱ Expires in 10 minutes</p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+
+    ${divider()}
+
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+      <tr>
+        <td style="background:${COLORS.bgSubtle};border:1px solid ${COLORS.border};border-radius:12px;padding:14px 18px;">
+          <p style="margin:0;font-size:12px;color:${COLORS.textMuted};line-height:1.5;">
+            🔒&nbsp;&nbsp;If you didn't request a password reset, you can safely ignore this email. Your password will remain unchanged.
+          </p>
+        </td>
+      </tr>
+    </table>`;
+
+  const html = baseLayout(body, `Your password reset code is ${code}`);
+
+  await transporter.sendMail({
+    from: FROM_HEADER,
+    to: email,
+    subject: `${code} — Your AttendIQ password reset code`,
+    text: `Your AttendIQ password reset code is ${code}. It expires in 10 minutes. If you didn't request this, please ignore this email.`,
+    html,
+  });
+}
