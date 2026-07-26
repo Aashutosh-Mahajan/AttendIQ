@@ -27,28 +27,53 @@ export default function AppShell({ children }: AppShellProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [semesterInfo, setSemesterInfo] = useState<{ name: string; target: number } | null>(null);
   const [userName, setUserName] = useState('Student');
+  const [authReady, setAuthReady] = useState(false);
+
+  const isAuthPage = pathname === '/login' || pathname === '/signup' || pathname === '/verify-email';
 
   useEffect(() => {
-    fetch('/api/semesters')
-      .then((res) => res.json())
+    // Skip API calls on auth pages — middleware handles redirects
+    if (isAuthPage) { setAuthReady(true); return; }
+
+    // Fetch semester info and auth in parallel
+    const semesterPromise = fetch('/api/semesters')
+      .then((res) => res.ok ? res.json() : null)
       .then((data) => {
-        if (data.activeSemester) {
-          setSemesterInfo({
-            name: data.activeSemester.name,
-            target: 75,
-          });
+        if (data?.activeSemester) {
+          setSemesterInfo({ name: data.activeSemester.name, target: 75 });
         }
       })
       .catch(() => {});
-    fetch('/api/auth/me').then((res) => res.ok ? res.json() : null).then((data) => { if (data?.user?.name) setUserName(data.user.name); else if (!data) window.location.assign('/login'); }).catch(() => window.location.assign('/login'));
-  }, []);
+
+    const authPromise = fetch('/api/auth/me')
+      .then((res) => res.ok ? res.json() : null)
+      .then((data) => {
+        if (data?.user?.name) setUserName(data.user.name);
+        else if (!data) window.location.assign('/login');
+      })
+      .catch(() => window.location.assign('/login'));
+
+    Promise.allSettled([semesterPromise, authPromise]).then(() => setAuthReady(true));
+  }, [pathname, isAuthPage]);
 
   const logout = async () => {
     await fetch('/api/auth/logout', { method: 'POST' });
     window.location.assign('/login');
   };
 
-  if (pathname === '/login' || pathname === '/signup' || pathname === '/verify-email') return <>{children}</>;
+  if (isAuthPage) return <>{children}</>;
+
+  // Show loading spinner while auth is being verified — prevents dashboard flash
+  if (!authReady) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#0b0f17]">
+        <div className="flex flex-col items-center gap-4">
+          <div className="h-10 w-10 rounded-full border-2 border-indigo-500 border-t-transparent animate-spin" />
+          <p className="text-sm text-gray-500 font-medium">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   const navItems = [
     { href: '/', label: 'Weekly Dashboard', icon: Calendar },
