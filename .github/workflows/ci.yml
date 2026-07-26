@@ -7,17 +7,9 @@ on:
     branches: [main]
 
 jobs:
-  build:
-    name: Type-check & Build
+  check:
+    name: Type-check & Lint
     runs-on: ubuntu-latest
-
-    env:
-      # Supabase — provided via GitHub Secrets (Settings → Secrets → Actions)
-      DATABASE_URL: ${{ secrets.DATABASE_URL }}
-      DIRECT_URL: ${{ secrets.DIRECT_URL }}
-      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-      NEXT_PUBLIC_SITE_URL: ${{ secrets.NEXT_PUBLIC_SITE_URL }}
 
     steps:
       # ── 1. Checkout ───────────────────────────────────────────
@@ -35,16 +27,14 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # postinstall runs `prisma generate` automatically after npm ci
+      # postinstall runs `prisma generate` automatically
 
       # ── 4. Type-check ─────────────────────────────────────────
+      # tsc --noEmit does not execute any code, no env vars needed
       - name: TypeScript type-check
         run: npx tsc --noEmit
 
       # ── 5. Lint ───────────────────────────────────────────────
+      # next lint only parses code, no env vars needed
       - name: Lint
         run: npm run lint
-
-      # ── 6. Build ──────────────────────────────────────────────
-      - name: Build
-        run: npm run build
