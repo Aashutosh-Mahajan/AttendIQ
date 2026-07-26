@@ -30,7 +30,7 @@ export default function AppShell({ children }: AppShellProps) {
   const [userName, setUserName] = useState('Student');
   const [authReady, setAuthReady] = useState(false);
 
-  const isAuthPage = ['/login', '/signup', '/verify-email', '/forgot-password', '/reset-password'].some(
+  const isAuthPage = ['/login', '/signup', '/verify-email', '/forgot-password', '/reset-password', '/'].some(
     (p) => pathname === p
   );
 
@@ -81,7 +81,7 @@ export default function AppShell({ children }: AppShellProps) {
   }
 
   const navItems = [
-    { href: '/', label: 'Weekly Dashboard', icon: Calendar },
+    { href: '/dashboard', label: 'Weekly Dashboard', icon: Calendar },
     { href: '/timetable', label: 'Timetable Builder', icon: Clock },
     { href: '/subjects', label: 'Subjects & Attendance', icon: BookOpen },
     { href: '/analytics', label: 'Analytics & Insights', icon: BarChart3 },

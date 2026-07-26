@@ -1,177 +1,370 @@
 <div align="center">
 
-<img src="public/logo.jpg" alt="AttendIQ Logo" width="160" style="border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.3);" />
+<img src="public/logo.jpg" alt="AttendIQ Logo" width="140" style="border-radius: 20px;" />
 
 # ⚡ AttendIQ
 
-### **Smart College Attendance Tracker**
+### Smart College Attendance Tracker
 *Track Today, Stay Ahead*
 
-*Automated lecture scheduling, live attendance analytics, and intelligent safe skip & recovery recommendations.*
-
-[![Next.js](https://img.shields.io/badge/Next.js-15-black?style=for-the-badge&logo=next.js)](https://nextjs.org/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?style=for-the-badge&logo=typescript)](https://www.typescriptlang.org/)
-[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-v4-06B6D4?style=for-the-badge&logo=tailwindcss)](https://tailwindcss.com/)
-[![Prisma](https://img.shields.io/badge/Prisma-6-2D3748?style=for-the-badge&logo=prisma)](https://www.prisma.io/)
-[![SQLite](https://img.shields.io/badge/SQLite-Database-003B57?style=for-the-badge&logo=sqlite)](https://www.sqlite.org/)
+[![Next.js](https://img.shields.io/badge/Next.js-15-black?style=flat-square&logo=next.js)](https://nextjs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3-06B6D4?style=flat-square&logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
+[![Prisma](https://img.shields.io/badge/Prisma-6-2D3748?style=flat-square&logo=prisma&logoColor=white)](https://www.prisma.io/)
+[![Supabase](https://img.shields.io/badge/Supabase-Auth_&_DB-3ECF8E?style=flat-square&logo=supabase&logoColor=white)](https://supabase.com/)
+[![CI](https://github.com/Aashutosh-Mahajan/AttendIQ/actions/workflows/ci.yml/badge.svg)](https://github.com/Aashutosh-Mahajan/AttendIQ/actions/workflows/ci.yml)
 
 </div>
 
 ---
 
+## Table of Contents
+
+- [Overview](#-overview)
+- [Features](#-features)
+- [Tech Stack](#-tech-stack)
+- [Project Structure](#-project-structure)
+- [Attendance Engine](#-attendance-engine)
+- [Auth Flow](#-auth-flow)
+- [Getting Started](#-getting-started)
+- [Environment Variables](#-environment-variables)
+- [Database Setup](#-database-setup)
+- [Deployment](#-deployment)
+- [CI/CD](#-cicd)
+- [Scripts](#-scripts)
+
+---
+
 ## 🌟 Overview
 
-**AttendIQ** is a personal web application designed for college students to track subject-wise and overall attendance effortlessly. By defining your weekly timetable once, AttendIQ automatically generates your daily lecture schedule.
-
-With the built-in **Attendance Engine**, the app calculates exactly how many classes you can safely miss while staying above your target percentage (e.g. 75%), or how many consecutive classes you must attend if you fall below threshold.
+**AttendIQ** is a full-stack web application for college students to track subject-wise attendance automatically. Define your weekly timetable once — AttendIQ generates every lecture instance across the semester, tracks your status, and tells you exactly how many classes you can skip or must attend to meet your target.
 
 ---
 
 ## ✨ Features
 
-- 📅 **Weekly Interactive Dashboard**: 
-  - Day-by-day 6-column view (Monday–Saturday) with lecture cards.
-  - Status management: `Scheduled`, `Attended`, `Missed`, and `Holiday`.
-  - Bulk **Mark Day as Holiday** for college closures.
-  - Week-by-week navigation controls with instant "Today" jump.
+**Weekly Dashboard**
+- Day-by-day 6-column view (Mon–Sat) with live lecture cards
+- One-click status update: `Attended`, `Missed`, `Holiday`, `Scheduled`
+- Bulk mark entire day as Holiday for college closures
+- Week navigation with instant jump to Today
 
-- 🧮 **Safe Skips & Recovery Engine**:
-  - Real-time attendance percentage calculation.
-  - **Safe Skips Indicator**: Tells you exact number of classes you can miss without dropping below target %.
-  - **Recovery Indicator**: Tells you exact number of consecutive classes required to recover lost attendance.
+**Attendance Engine**
+- Real-time percentage per subject and overall
+- **Safe Skip Calculator** — exact number of classes you can miss without dropping below target
+- **Recovery Calculator** — consecutive classes needed to recover from low attendance
+- Status badges: `SAFE` (green) · `WARNING` (amber) · `CRITICAL` (red)
 
-- ⚡ **Rolling-Window Lecture Generator**:
-  - Automatically generates upcoming dated lecture instances 3 weeks in advance based on your active timetable.
-  - **Safeguarded**: Editing timetables mid-semester never overwrites past historical attendance data.
+**Timetable Builder**
+- Recurring weekly schedule builder
+- Auto collision detection — prevents overlapping time slots
+- Lectures auto-generated for the entire semester on slot creation
+- Safe timetable edits — past attendance history is never overwritten
 
-- 🎨 **Ultra-Sleek Obsidian Dark Theme**:
-  - Premium modern UI built on `#0b0f17` obsidian background with frosted glass cards (`backdrop-blur-md`).
-  - Glowing status badges (Emerald for Attended, Cyan for Active, Rose for Missed, Amber for Holiday).
-  - Fully responsive with mobile navigation drawer.
+**Subjects & Analytics**
+- Per-subject color tags and target percentage customization
+- Recharts bar chart comparing subjects against target threshold
+- Semester progression trend line chart
 
-- 📊 **Analytics & Visual Insights**:
-  - Recharts bar chart comparing subject attendance percentages against target threshold lines.
-  - Semester progression trend line chart.
+**Authentication**
+- Email + Password signup with OTP email verification
+- 6-digit OTP for password reset
+- Settings page with OTP-verified password change
+- Session managed via Supabase SSR cookies
 
-- 📅 **Timetable Builder & Overlap Validation**:
-  - Drag/click weekly schedule builder with automatic collision detection preventing time slot overlaps.
-  - Subject color tag customizers and target percentage sliders.
-
----
-
-## 🧮 Mathematical Formulas
-
-The attendance calculation engine operates on the following rules:
-
-### 1. Attendance Percentage
-$$\text{Percentage} = \frac{\text{Attended}}{\text{Attended} + \text{Missed}} \times 100$$
-*(Note: `HOLIDAY` and future `SCHEDULED` lectures are excluded from calculations).*
-
-### 2. Maximum Safe Skips ($S$)
-When current percentage is **at or above** target ($P \ge P_{\text{target}}$):
-$$S = \left\lfloor \frac{\text{Attended} - (\text{Target Ratio} \times \text{Counted})}{\text{Target Ratio}} \right\rfloor$$
-*Where $\text{Target Ratio} = \frac{\text{Target \%}}{100}$.*
-
-### 3. Minimum Required Attendance ($N$)
-When current percentage is **below** target ($P < P_{\text{target}}$):
-$$N = \left\lceil \frac{(\text{Target Ratio} \times \text{Counted}) - \text{Attended}}{1 - \text{Target Ratio}} \right\rceil$$
+**UI**
+- Obsidian dark theme (`#0b0f17`) with frosted glass cards
+- Glowing status indicators and gradient accents
+- Fully responsive with mobile navigation drawer
 
 ---
 
-## 🛠️ Tech Stack
+## 🛠 Tech Stack
 
-| Layer | Technology | Description |
-|---|---|---|
-| **Framework** | Next.js 15 (App Router) | Server-side rendering, React Server Components & API routes |
-| **Language** | TypeScript 5 | End-to-end type safety |
-| **Styling** | Tailwind CSS v4 & Glassmorphism | Custom dark theme system with backdrop blurs and glowing accents |
-| **Database** | SQLite via Prisma ORM | Zero-config relational storage & migrations |
-| **Icons & Charts** | Lucide React & Recharts | Modern icons and responsive data visualizations |
-| **Date Utility** | `date-fns` | Date calculations, week boundaries, and formatting |
+| Layer | Technology |
+|---|---|
+| Framework | Next.js 15 (App Router) |
+| Language | TypeScript 5 |
+| Styling | Tailwind CSS 3 + Glassmorphism |
+| ORM | Prisma 6 |
+| Database | Supabase PostgreSQL |
+| Auth | Supabase Auth (Email OTP) |
+| Charts | Recharts |
+| Icons | Lucide React |
+| Date Utils | date-fns |
+| Deployment | Vercel |
+| CI | GitHub Actions |
 
 ---
 
 ## 📁 Project Structure
 
-```text
+```
 AttendIQ/
+├── .github/
+│   └── workflows/
+│       └── ci.yml              # GitHub Actions — type-check & lint on every push
 ├── prisma/
-│   ├── schema.prisma       # Prisma data schema (User, Semester, Subject, TimetableSlot, LectureInstance)
-│   └── seed.ts             # Seed script populating demo user & semester
+│   ├── schema.prisma           # Prisma schema (Semester, Subject, TimetableSlot, LectureInstance)
+│   ├── migrations/             # SQL migration history
+│   └── seed.ts                 # Seed script (clears business data)
+├── public/
+│   └── logo.jpg                # App logo
+├── scripts/
+│   └── rls-policies.sql        # Supabase Row Level Security policies
 ├── src/
 │   ├── app/
-│   │   ├── analytics/      # Analytics & Recharts page (/analytics)
-│   │   ├── api/            # REST API endpoints (auth, semesters, subjects, timetable, lectures)
-│   │   ├── settings/       # Settings & Semester Management (/settings)
-│   │   ├── subjects/       # Subjects & Attendance (/subjects)
-│   │   ├── timetable/      # Weekly Timetable Builder (/timetable)
-│   │   ├── globals.css     # Dark obsidian theme & glassmorphism utilities
-│   │   ├── layout.tsx      # Root layout wrapped in AppShell navigation
-│   │   └── page.tsx        # Main Weekly Dashboard home page
+│   │   ├── api/
+│   │   │   ├── auth/
+│   │   │   │   ├── [...path]/  # Catch-all stub (legacy)
+│   │   │   │   ├── callback/   # Supabase OAuth/magic-link callback
+│   │   │   │   └── me/         # GET current user
+│   │   │   ├── lectures/       # GET/PATCH/POST lecture instances
+│   │   │   │   └── generate/   # POST trigger lecture generation
+│   │   │   ├── semesters/      # GET/POST/PATCH semesters
+│   │   │   ├── subjects/       # GET/POST/PUT/DELETE subjects
+│   │   │   ├── timetable/      # GET/POST/PUT/DELETE timetable slots
+│   │   │   └── settings/
+│   │   │       ├── route.ts    # GET/PATCH profile settings
+│   │   │       └── password/
+│   │   │           ├── request/  # POST send password reset OTP
+│   │   │           └── update/   # POST update password
+│   │   ├── analytics/          # Analytics & charts page
+│   │   ├── forgot-password/    # Forgot password page
+│   │   ├── login/              # Login page
+│   │   ├── reset-password/     # Reset password (OTP + new password)
+│   │   ├── settings/           # User settings page
+│   │   ├── signup/             # Signup page (2-step with OTP)
+│   │   ├── subjects/           # Subjects & attendance page
+│   │   ├── timetable/          # Timetable builder page
+│   │   ├── verify-email/       # Email OTP verification page
+│   │   ├── globals.css         # Obsidian dark theme & glassmorphism utilities
+│   │   ├── layout.tsx          # Root layout with AppShell
+│   │   └── page.tsx            # Weekly dashboard home
 │   ├── components/
-│   │   ├── analytics/      # Recharts bar & line chart components
-│   │   ├── dashboard/      # WeeklyView & LectureCard components
-│   │   ├── layout/         # AppShell sidebar navigation & header
-│   │   ├── subject/        # Subject attendance status components
-│   │   └── timetable/      # TimetableGrid scheduler component
-│   └── lib/
-│       ├── calculator.ts   # Attendance & safe skip calculation engine
-│       ├── generator.ts    # Rolling lecture auto-generation engine
-│       └── prisma.ts       # Singleton PrismaClient instance
-├── tailwind.config.js      # Custom obsidian color palette & glow utilities
-├── tsconfig.json           # TypeScript configuration
-└── package.json            # Dependencies & scripts
+│   │   ├── analytics/          # AttendanceCharts (Recharts)
+│   │   ├── auth/               # AuthForm (login/signup/OTP/reset)
+│   │   ├── dashboard/          # WeeklyView, LectureCard, LiveClock
+│   │   ├── layout/             # AppShell (sidebar + mobile nav)
+│   │   ├── subject/            # BunkCalculatorCard
+│   │   └── timetable/          # TimetableGrid
+│   ├── emails/
+│   │   ├── otp-template.html         # Supabase signup OTP email template
+│   │   └── reset-password-template.html  # Supabase password reset email template
+│   ├── lib/
+│   │   ├── auth/
+│   │   │   ├── client.ts       # Supabase browser client
+│   │   │   └── server.ts       # Supabase server client (SSR)
+│   │   ├── calculator.ts       # Attendance & safe skip/recovery engine
+│   │   ├── generator.ts        # Semester-wide lecture auto-generator
+│   │   ├── getUser.ts          # Server-side auth helper
+│   │   └── prisma.ts           # Singleton PrismaClient
+│   └── middleware.ts           # Route protection (Supabase session check)
+├── .env.example                # Environment variable template
+├── vercel.json                 # Vercel deployment config
+├── next.config.js              # Next.js config
+├── prisma/schema.prisma        # Database schema
+└── package.json
 ```
+
+---
+
+## 🧮 Attendance Engine
+
+All calculations live in `src/lib/calculator.ts`. Only `ATTENDED` and `MISSED` statuses count — `HOLIDAY` and `SCHEDULED` are excluded.
+
+**Attendance Percentage**
+```
+percentage = (attended / (attended + missed)) × 100
+```
+
+**Safe Skips** — when `percentage >= target`
+```
+skippable = floor((attended - targetRatio × counted) / targetRatio)
+```
+
+**Recovery Classes** — when `percentage < target`
+```
+mustAttend = ceil((targetRatio × counted - attended) / (1 - targetRatio))
+```
+
+Where `targetRatio = targetPercentage / 100` (default 75%).
+
+---
+
+## 🔐 Auth Flow
+
+| Flow | Steps |
+|---|---|
+| **Sign up** | Enter name/email/password → OTP sent via Supabase → Enter 6-digit code → Logged in |
+| **Login** | Email + password → Session cookie set → Dashboard |
+| **Forgot password** | Enter email → Reset OTP email sent → Enter code + new password → Login |
+| **Change password** (settings) | Click "Send verification code" → OTP email sent → Enter code → Enter new password |
+| **Session** | Supabase SSR cookies, refreshed by middleware on every request |
+
+Email templates are in `src/emails/` — add them to **Supabase → Authentication → Email Templates**.
 
 ---
 
 ## 🚀 Getting Started
 
 ### Prerequisites
-- **Node.js**: v18.0.0 or higher
-- **npm**: v9.0.0 or higher
 
-### Installation
+- Node.js 20+
+- npm 9+
+- A [Supabase](https://supabase.com) project
 
-1. **Clone the repository**:
-   ```bash
-   git clone https://github.com/Aashutosh-Mahajan/AttendIQ.git
-   cd AttendIQ
-   ```
+### Local Setup
 
-2. **Install dependencies**:
-   ```bash
-   npm install
-   ```
+**1. Clone the repo**
+```bash
+git clone https://github.com/Aashutosh-Mahajan/AttendIQ.git
+cd AttendIQ
+```
 
-3. **Setup Database Schema & Seed Data**:
-   ```bash
-   npx prisma db push
-   npx tsx prisma/seed.ts
-   ```
+**2. Install dependencies**
+```bash
+npm install
+```
 
-4. **Start Development Server**:
-   ```bash
-   npm run dev
-   ```
+**3. Set up environment variables**
+```bash
+cp .env.example .env
+```
+Fill in your Supabase credentials (see [Environment Variables](#-environment-variables)).
 
-5. **Open Application**:
-   Navigate to [http://localhost:3000](http://localhost:3000) in your browser.
+**4. Push database schema**
+```bash
+npx prisma db push
+```
+
+**5. Apply RLS policies**
+
+Open `scripts/rls-policies.sql` and run it in **Supabase → SQL Editor**.
+
+**6. Start the dev server**
+```bash
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000).
 
 ---
 
-## 📝 Available Scripts
+## 🔑 Environment Variables
+
+Copy `.env.example` to `.env` and fill in the values.
+
+```env
+# Supabase PostgreSQL — Transaction mode (port 6543, for Prisma runtime)
+DATABASE_URL="postgresql://postgres.[PROJECT-REF]:[PASSWORD]@aws-0-[REGION].pooler.supabase.com:6543/postgres?pgbouncer=true"
+
+# Supabase PostgreSQL — Direct connection (port 5432, for Prisma migrations)
+DIRECT_URL="postgresql://postgres.[PROJECT-REF]:[PASSWORD]@aws-0-[REGION].pooler.supabase.com:5432/postgres"
+
+# Supabase project URL — Project Settings → API → Project URL
+NEXT_PUBLIC_SUPABASE_URL="https://[PROJECT-REF].supabase.co"
+
+# Supabase anon public key — Project Settings → API → anon public
+NEXT_PUBLIC_SUPABASE_ANON_KEY="your-anon-key-here"
+
+# Your site URL (used in auth email redirect links)
+NEXT_PUBLIC_SITE_URL="http://localhost:3000"
+```
+
+Where to find values in Supabase Dashboard:
+- `DATABASE_URL` / `DIRECT_URL` → Project Settings → Database → Connection string
+- `NEXT_PUBLIC_SUPABASE_URL` → Project Settings → API → Project URL
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY` → Project Settings → API → anon public key
+
+---
+
+## 🗄 Database Setup
+
+The schema has four tables — all owned by your app, users are managed by Supabase Auth.
+
+```
+Semester ──< Subject ──< TimetableSlot
+                    ──< LectureInstance
+```
+
+**Run migrations**
+```bash
+# Development — push schema directly
+npx prisma db push
+
+# Production — run migration history
+npx prisma migrate deploy
+```
+
+**Apply RLS policies** (required for Supabase security)
+
+Run `scripts/rls-policies.sql` in Supabase → SQL Editor. This ensures each user can only read/write their own data.
+
+---
+
+## 🌐 Deployment
+
+### Vercel (recommended)
+
+1. Import the repo at [vercel.com/new](https://vercel.com/new)
+2. Set **Build Command** to:
+   ```
+   prisma generate && next build
+   ```
+3. Add all 5 environment variables (same as `.env` but with your production Supabase URL for `NEXT_PUBLIC_SITE_URL`)
+4. Deploy
+
+**After first deploy — update Supabase Auth URLs:**
+
+Go to Supabase → Authentication → URL Configuration:
+- **Site URL**: `https://your-app.vercel.app`
+- **Redirect URLs**: add `https://your-app.vercel.app/api/auth/callback` and `https://your-app.vercel.app/reset-password`
+
+Then update `NEXT_PUBLIC_SITE_URL` in Vercel env vars to your real deployment URL and redeploy.
+
+---
+
+## ⚙️ CI/CD
+
+GitHub Actions runs on every push and pull request to `main`.
+
+**Workflow** (`.github/workflows/ci.yml`):
+1. Install dependencies (`npm ci`)
+2. TypeScript type-check (`tsc --noEmit`)
+3. Lint (`next lint`)
+
+The build itself is handled by Vercel on deploy — CI only validates code correctness.
+
+**Required GitHub Secrets** (Settings → Secrets → Actions):
+
+| Secret | Description |
+|---|---|
+| `DATABASE_URL` | Supabase pooled connection string |
+| `DIRECT_URL` | Supabase direct connection string |
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon key |
+| `NEXT_PUBLIC_SITE_URL` | Your deployed site URL |
+
+---
+
+## 📝 Scripts
 
 | Command | Description |
 |---|---|
-| `npm run dev` | Starts the Next.js development server at `http://localhost:3000` |
-| `npm run build` | Builds the production bundle and runs type checks |
-| `npm start` | Starts the production server |
-| `npx prisma db push` | Syncs the Prisma schema with the SQLite database |
-| `npx tsx prisma/seed.ts` | Seeds the database |
+| `npm run dev` | Start development server at `http://localhost:3000` |
+| `npm run build` | Production build |
+| `npm start` | Start production server |
+| `npm run lint` | Run ESLint |
+| `npx tsc --noEmit` | TypeScript type-check |
+| `npx prisma db push` | Sync schema to database (dev) |
+| `npx prisma migrate deploy` | Run migrations (production) |
+| `npx prisma studio` | Open Prisma database browser |
 
 ---
 
-## 🔒 License
+---
 
-This project is open source and available under the [MIT License](LICENSE).
+<div align="center">
+  <sub>Built by <a href="https://github.com/Aashutosh-Mahajan">Aashutosh Mahajan</a></sub>
+</div>

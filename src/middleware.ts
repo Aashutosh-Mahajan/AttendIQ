@@ -1,24 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 
-/** Routes that are always public — no auth redirect in either direction */
-const ALWAYS_PUBLIC = ['/verify-email'];
+/** Always public — no auth check in either direction */
+const ALWAYS_PUBLIC = ['/', '/verify-email'];
 
-/** Routes that redirect to dashboard if already authenticated */
+/** Public auth pages — redirect to /dashboard if already signed in */
 const GUEST_ONLY = ['/login', '/signup', '/forgot-password', '/reset-password'];
 
-/** Routes that don't need any auth check */
+/** Skip middleware entirely */
 const PUBLIC_PREFIXES = ['/api/auth/callback'];
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Allow Supabase auth callback and static assets through
   if (PUBLIC_PREFIXES.some((p) => pathname.startsWith(p))) {
     return NextResponse.next();
   }
 
-  // We need to create a response first so we can mutate cookies
   let response = NextResponse.next({ request });
 
   const supabase = createServerClient(
@@ -42,27 +40,23 @@ export async function middleware(request: NextRequest) {
     }
   );
 
-  // Refresh session if expired — required for Server Components to stay in sync
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // Always-public routes — let through regardless of auth state
+  // Always-public — let through regardless of auth state
   if (ALWAYS_PUBLIC.some((p) => pathname === p || pathname.startsWith(p + '/'))) {
     return response;
   }
 
-  const isGuestOnly = GUEST_ONLY.some((p) => pathname === p || pathname.startsWith(p + '/'));
-
-  if (isGuestOnly) {
-    // Already signed in → redirect to dashboard
+  if (GUEST_ONLY.some((p) => pathname === p || pathname.startsWith(p + '/'))) {
     if (user) {
-      return NextResponse.redirect(new URL('/', request.url));
+      return NextResponse.redirect(new URL('/dashboard', request.url));
     }
     return response;
   }
 
-  // Protected route — no session → redirect to login
+  // Everything else is protected
   if (!user) {
     const loginUrl = new URL('/login', request.url);
     loginUrl.searchParams.set('next', pathname);
