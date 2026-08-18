@@ -43,6 +43,7 @@ model Subject {
   lectureInstances LectureInstance[]
 
   @@index([userId])
+  @@index([userId, semesterId])
 }
 
 model TimetableSlot {
@@ -60,6 +61,8 @@ model TimetableSlot {
   lectureInstances LectureInstance[]
 
   @@index([userId])
+  @@index([userId, dayOfWeek])
+  @@index([subjectId, dayOfWeek])
 }
 
 model LectureInstance {
@@ -79,4 +82,6 @@ model LectureInstance {
 
   @@unique([subjectId, date, startTime], name: "subject_date_time_unique")
   @@index([userId])
+  @@index([userId, date])
+  @@index([subjectId, date])
 }

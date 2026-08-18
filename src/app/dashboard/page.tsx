@@ -5,15 +5,15 @@ import WeeklyView from '@/components/dashboard/WeeklyView';
 import Link from 'next/link';
 import Image from 'next/image';
 import { BookOpen, Clock, ArrowRight, Sparkles, FileSpreadsheet } from 'lucide-react';
+import { fetchJson } from '@/lib/api-client';
 
 export default function DashboardPage() {
   const [hasSubjects, setHasSubjects] = useState<boolean | null>(null);
 
   useEffect(() => {
-    fetch('/api/subjects')
-      .then((res) => (res.ok ? res.json() : null))
+    fetchJson('/api/subjects')
       .then((data) => {
-        setHasSubjects(data?.subjects && data.subjects.length > 0);
+        setHasSubjects(Boolean(data?.subjects && data.subjects.length > 0));
       })
       .catch(() => setHasSubjects(false));
   }, []);

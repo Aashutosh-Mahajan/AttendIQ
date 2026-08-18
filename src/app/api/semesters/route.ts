@@ -16,8 +16,12 @@ export async function GET() {
       include: {
         subjects: {
           include: {
-            timetableSlots: true,
-            lectureInstances: true,
+            timetableSlots: {
+              where: { isActive: true },
+            },
+            lectureInstances: {
+              select: { status: true },
+            },
           },
         },
       },
@@ -28,7 +32,11 @@ export async function GET() {
       orderBy: { createdAt: 'desc' },
       include: {
         subjects: {
-          include: { lectureInstances: true },
+          include: {
+            lectureInstances: {
+              select: { status: true },
+            },
+          },
         },
       },
     });
@@ -51,7 +59,14 @@ export async function GET() {
       };
     });
 
-    return NextResponse.json({ activeSemester, semesters });
+    return NextResponse.json(
+      { activeSemester, semesters },
+      {
+        headers: {
+          'Cache-Control': 'private, no-cache, no-store, must-revalidate',
+        },
+      }
+    );
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

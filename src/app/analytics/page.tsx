@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { BarChart3, ArrowRight } from 'lucide-react';
 import AttendanceCharts, { SubjectAnalytics, TrendPoint } from '@/components/analytics/AttendanceCharts';
+import { fetchJson } from '@/lib/api-client';
 
 export default function AnalyticsPage() {
   const [subjects, setSubjects] = useState<SubjectAnalytics[]>([]);
@@ -15,11 +16,15 @@ export default function AnalyticsPage() {
   useEffect(() => {
     const load = async () => {
       try {
-        const [subjectRes, termRes] = await Promise.all([fetch('/api/subjects'), fetch('/api/semesters')]);
-        const subjectData = await subjectRes.json();
-        const termData = await termRes.json();
+        const [subjectData, termData, lecturesData] = await Promise.all([
+          fetchJson('/api/subjects', { ttl: 5000 }),
+          fetchJson('/api/semesters', { ttl: 15000 }),
+          fetchJson('/api/lectures', { ttl: 5000 }),
+        ]);
+
         setHasSemester(Boolean(termData.activeSemester));
         const raw = subjectData.subjects ?? [];
+        const allLectures = lecturesData.lectures ?? [];
 
         let attended = 0, counted = 0;
         const weekly = new Map<string, { attended: number; counted: number }>();
@@ -28,18 +33,6 @@ export default function AnalyticsPage() {
           const stats = subject.stats;
           attended += stats?.attendedCount ?? 0;
           counted += stats?.countedLectures ?? 0;
-
-          (subject.lectureInstances ?? []).forEach((lecture: any) => {
-            if (lecture.status !== 'ATTENDED' && lecture.status !== 'MISSED') return;
-            const date = new Date(lecture.date);
-            const monday = new Date(date);
-            monday.setDate(date.getDate() - ((date.getDay() + 6) % 7));
-            const key = monday.toISOString().slice(0, 10);
-            const point = weekly.get(key) ?? { attended: 0, counted: 0 };
-            point.counted++;
-            if (lecture.status === 'ATTENDED') point.attended++;
-            weekly.set(key, point);
-          });
 
           return {
             name: subject.name,
@@ -50,6 +43,18 @@ export default function AnalyticsPage() {
             attended: stats?.attendedCount ?? 0,
             total: stats?.countedLectures ?? 0,
           };
+        });
+
+        allLectures.forEach((lecture: any) => {
+          if (lecture.status !== 'ATTENDED' && lecture.status !== 'MISSED') return;
+          const date = new Date(lecture.date);
+          const monday = new Date(date);
+          monday.setDate(date.getDate() - ((date.getDay() + 6) % 7));
+          const key = monday.toISOString().slice(0, 10);
+          const point = weekly.get(key) ?? { attended: 0, counted: 0 };
+          point.counted++;
+          if (lecture.status === 'ATTENDED') point.attended++;
+          weekly.set(key, point);
         });
 
         setSubjects(formatted);

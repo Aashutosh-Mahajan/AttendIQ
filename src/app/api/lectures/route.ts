@@ -15,9 +15,6 @@ export async function GET(req: Request) {
     const startStr = searchParams.get('startDate');
     const endStr = searchParams.get('endDate');
 
-    // Auto generate missing lectures up to 21 days ahead
-    await generateLecturesForUser(user.id);
-
     const activeSemester = await prisma.semester.findFirst({
       where: { userId: user.id, isActive: true },
       orderBy: { createdAt: 'desc' },
@@ -50,7 +47,7 @@ export async function GET(req: Request) {
       };
     }
 
-    const lectures = await prisma.lectureInstance.findMany({
+    let lectures = await prisma.lectureInstance.findMany({
       where: whereClause,
       include: {
         subject: true,
@@ -58,7 +55,43 @@ export async function GET(req: Request) {
       orderBy: [{ date: 'asc' }, { startTime: 'asc' }],
     });
 
-    return NextResponse.json({ lectures });
+    // If no lectures exist for this query, verify if generation is needed
+    if (lectures.length === 0) {
+      const activeSlotCount = await prisma.timetableSlot.count({
+        where: {
+          userId: user.id,
+          isActive: true,
+          subject: { semesterId: activeSemester.id },
+        },
+      });
+
+      if (activeSlotCount > 0) {
+        const existingCount = await prisma.lectureInstance.count({
+          where: {
+            userId: user.id,
+            subject: { semesterId: activeSemester.id },
+          },
+        });
+
+        if (existingCount === 0) {
+          await generateLecturesForUser(user.id);
+          lectures = await prisma.lectureInstance.findMany({
+            where: whereClause,
+            include: { subject: true },
+            orderBy: [{ date: 'asc' }, { startTime: 'asc' }],
+          });
+        }
+      }
+    }
+
+    return NextResponse.json(
+      { lectures },
+      {
+        headers: {
+          'Cache-Control': 'private, no-cache, no-store, must-revalidate',
+        },
+      }
+    );
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

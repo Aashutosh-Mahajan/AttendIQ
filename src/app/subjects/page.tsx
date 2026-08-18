@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { AlertCircle, BookOpen, Plus, X, ArrowRight } from 'lucide-react';
 import BunkCalculatorCard from '@/components/subject/BunkCalculatorCard';
+import { fetchJson, invalidateCache } from '@/lib/api-client';
 
 interface SubjectData {
   id: string;
@@ -38,12 +39,13 @@ export default function SubjectsPage() {
   const [target, setTarget] = useState('75');
   const [error, setError] = useState('');
 
-  const load = async () => {
+  const load = async (forceRefresh = false) => {
     try {
       setLoading(true);
-      const [subjectRes, termRes] = await Promise.all([fetch('/api/subjects'), fetch('/api/semesters')]);
-      const subjectData = await subjectRes.json();
-      const termData = await termRes.json();
+      const [subjectData, termData] = await Promise.all([
+        fetchJson('/api/subjects', { forceRefresh, ttl: 5000 }),
+        fetchJson('/api/semesters', { forceRefresh, ttl: 15000 }),
+      ]);
       setSubjects(subjectData.subjects ?? []);
       setHasSemester(Boolean(termData.activeSemester));
     } finally {
@@ -77,27 +79,39 @@ export default function SubjectsPage() {
 
   const save = async (event: React.FormEvent) => {
     event.preventDefault();
-    const response = await fetch('/api/subjects', {
-      method: modal === 'edit' ? 'PUT' : 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: editing?.id, name, code, color, targetPercentage: target }),
-    });
-    const result = await response.json();
-    if (!response.ok) {
-      setError(result.error ?? 'Unable to save subject.');
-      return;
+    try {
+      invalidateCache('/api/subjects');
+      invalidateCache('/api/lectures');
+      const response = await fetch('/api/subjects', {
+        method: modal === 'edit' ? 'PUT' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: editing?.id, name, code, color, targetPercentage: target }),
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        setError(result.error ?? 'Unable to save subject.');
+        return;
+      }
+      setModal(null);
+      await load(true);
+    } catch {
+      setError('Failed to save subject.');
     }
-    setModal(null);
-    await load();
   };
 
   const remove = async (subject: SubjectData) => {
     if (!window.confirm(`Delete ${subject.name} and its lecture history? This cannot be undone.`)) return;
-    const response = await fetch(`/api/subjects?id=${subject.id}`, { method: 'DELETE' });
-    if (response.ok) await load();
-    else {
-      const result = await response.json();
-      window.alert(result.error ?? 'Unable to delete subject.');
+    try {
+      invalidateCache('/api/subjects');
+      invalidateCache('/api/lectures');
+      const response = await fetch(`/api/subjects?id=${subject.id}`, { method: 'DELETE' });
+      if (response.ok) await load(true);
+      else {
+        const result = await response.json();
+        window.alert(result.error ?? 'Unable to delete subject.');
+      }
+    } catch {
+      window.alert('Failed to delete subject.');
     }
   };
 

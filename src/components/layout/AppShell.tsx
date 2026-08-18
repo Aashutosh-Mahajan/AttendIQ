@@ -18,6 +18,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { createSupabaseBrowserClient } from '@/lib/auth/client';
+import { fetchJson } from '@/lib/api-client';
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -39,8 +40,7 @@ export default function AppShell({ children }: AppShellProps) {
   useEffect(() => {
     if (isAuthPage) { setAuthReady(true); return; }
 
-    const semesterPromise = fetch('/api/semesters')
-      .then((res) => (res.ok ? res.json() : null))
+    const semesterPromise = fetchJson('/api/semesters', { ttl: 30000 })
       .then((data) => {
         if (data?.activeSemester) {
           setSemesterInfo({ name: data.activeSemester.name });

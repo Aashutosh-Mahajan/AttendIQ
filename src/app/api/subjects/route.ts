@@ -20,20 +20,39 @@ export async function GET() {
     const subjects = await prisma.subject.findMany({
       where: { userId: user.id, semesterId: activeSemester.id },
       include: {
-        timetableSlots: { where: { isActive: true } },
-        lectureInstances: true,
+        timetableSlots: {
+          where: { isActive: true },
+          select: { id: true, dayOfWeek: true, startTime: true, endTime: true, room: true, isActive: true },
+        },
+        lectureInstances: {
+          select: { status: true },
+        },
       },
+      orderBy: { name: 'asc' },
     });
 
     const enrichedSubjects = subjects.map((subject) => {
       const stats = calculateAttendance(subject.lectureInstances, subject.targetPercentage);
       return {
-        ...subject,
+        id: subject.id,
+        name: subject.name,
+        code: subject.code,
+        color: subject.color,
+        targetPercentage: subject.targetPercentage,
+        semesterId: subject.semesterId,
+        timetableSlots: subject.timetableSlots,
         stats,
       };
     });
 
-    return NextResponse.json({ subjects: enrichedSubjects });
+    return NextResponse.json(
+      { subjects: enrichedSubjects },
+      {
+        headers: {
+          'Cache-Control': 'private, no-cache, no-store, must-revalidate',
+        },
+      }
+    );
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

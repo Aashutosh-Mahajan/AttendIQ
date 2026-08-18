@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { eachDayOfInterval, endOfMonth, format, getDay, isSameDay, isSameMonth, startOfMonth } from 'date-fns';
 import { AlertCircle, CalendarDays, Check, Clock, History, MapPin, Pencil, Plus, Trash2, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { fetchJson, invalidateCache } from '@/lib/api-client';
 
 interface Subject { id: string; name: string; color: string }
 interface TimetableSlot { id: string; dayOfWeek: number; startTime: string; endTime: string; room?: string | null; isActive: boolean; subject: Subject }
@@ -284,12 +285,13 @@ export default function TimetableGrid() {
   const [room, setRoom] = useState('');
   const [error, setError] = useState('');
 
-  const fetchData = async () => {
+  const fetchData = async (forceRefresh = false) => {
     try {
       setLoading(true);
-      const [termsRes, slotsRes] = await Promise.all([fetch('/api/semesters'), fetch('/api/timetable')]);
-      const termsData = await termsRes.json();
-      const slotsData = await slotsRes.json();
+      const [termsData, slotsData] = await Promise.all([
+        fetchJson('/api/semesters', { forceRefresh, ttl: 15000 }),
+        fetchJson('/api/timetable', { forceRefresh, ttl: 5000 }),
+      ]);
       setSemester(termsData.activeSemester ?? null);
       setTerms(termsData.semesters ?? []);
       setSlots((slotsData.slots ?? []).filter((slot: TimetableSlot) => slot.isActive));
@@ -315,19 +317,24 @@ export default function TimetableGrid() {
 
   const saveTerm = async (event: React.FormEvent) => {
     event.preventDefault();
-    const response = await fetch('/api/semesters', {
-      method: termModal === 'edit' ? 'PATCH' : 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: semester?.id, name, startDate: start, endDate: end, makeActive: true }),
-    });
-    const result = await response.json();
-    if (!response.ok) {
-      setError(result.error ?? 'Unable to save the term.');
-      return;
+    try {
+      invalidateCache();
+      const response = await fetch('/api/semesters', {
+        method: termModal === 'edit' ? 'PATCH' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: semester?.id, name, startDate: start, endDate: end, makeActive: true }),
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        setError(result.error ?? 'Unable to save the term.');
+        return;
+      }
+      setTermModal(null);
+      resetTerm();
+      await fetchData(true);
+    } catch {
+      setError('Failed to save semester term.');
     }
-    setTermModal(null);
-    resetTerm();
-    await fetchData();
   };
 
   const openSlot = (slot?: TimetableSlot) => {
@@ -343,24 +350,34 @@ export default function TimetableGrid() {
 
   const saveSlot = async (event: React.FormEvent) => {
     event.preventDefault();
-    const response = await fetch('/api/timetable', {
-      method: editingSlot ? 'PUT' : 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: editingSlot?.id, subjectName: subject, dayOfWeek: day, startTime, endTime, room }),
-    });
-    const result = await response.json();
-    if (!response.ok) {
-      setError(result.error ?? 'Unable to save lecture.');
-      return;
+    try {
+      invalidateCache();
+      const response = await fetch('/api/timetable', {
+        method: editingSlot ? 'PUT' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: editingSlot?.id, subjectName: subject, dayOfWeek: day, startTime, endTime, room }),
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        setError(result.error ?? 'Unable to save lecture.');
+        return;
+      }
+      setSlotModal(false);
+      await fetchData(true);
+    } catch {
+      setError('Failed to save timetable slot.');
     }
-    setSlotModal(false);
-    await fetchData();
   };
 
   const removeSlot = async (id: string) => {
     if (!window.confirm('Remove this recurring lecture? Past attendance will be kept.')) return;
-    await fetch(`/api/timetable?id=${id}`, { method: 'DELETE' });
-    await fetchData();
+    try {
+      invalidateCache();
+      await fetch(`/api/timetable?id=${id}`, { method: 'DELETE' });
+      await fetchData(true);
+    } catch {
+      window.alert('Failed to remove slot.');
+    }
   };
 
   if (loading) return <div className="h-80 rounded-2xl paper-card border border-white/5 animate-pulse" />;

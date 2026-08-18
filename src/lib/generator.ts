@@ -1,6 +1,6 @@
 import { prisma } from './prisma';
 
-/** Creates the lecture instances for every recurring slot through the end of the active term. */
+/** Creates the lecture instances for every recurring slot through the end of the active term in a single fast batch. */
 export async function generateLecturesForUser(userId: string) {
   // Find active semester for user
   const activeSemester = await prisma.semester.findFirst({
@@ -10,11 +10,11 @@ export async function generateLecturesForUser(userId: string) {
       subjects: {
         include: {
           timetableSlots: {
-            where: { isActive: true }
-          }
-        }
-      }
-    }
+            where: { isActive: true },
+          },
+        },
+      },
+    },
   });
 
   if (!activeSemester) return { generatedCount: 0, message: 'No active semester found.' };
@@ -37,11 +37,10 @@ export async function generateLecturesForUser(userId: string) {
   }
 
   // Flatten active slots
-  const allSlots = activeSemester.subjects.flatMap(subject =>
-    subject.timetableSlots.map(slot => ({
+  const allSlots = activeSemester.subjects.flatMap((subject) =>
+    subject.timetableSlots.map((slot) => ({
       ...slot,
       subjectId: subject.id,
-      color: subject.color
     }))
   );
 
@@ -49,47 +48,50 @@ export async function generateLecturesForUser(userId: string) {
     return { generatedCount: 0, message: 'No active timetable slots found.' };
   }
 
-  let generatedCount = 0;
+  const recordsToInsert: Array<{
+    userId: string;
+    subjectId: string;
+    timetableSlotId: string;
+    date: Date;
+    startTime: string;
+    endTime: string;
+    status: string;
+  }> = [];
+
   const curr = new Date(`${startDateStr}T00:00:00.000Z`);
   const end = new Date(`${endDateStr}T00:00:00.000Z`);
 
   while (curr <= end) {
     const dayOfWeek = curr.getUTCDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
-    const matchingSlots = allSlots.filter(s => s.dayOfWeek === dayOfWeek);
+    const matchingSlots = allSlots.filter((s) => s.dayOfWeek === dayOfWeek);
 
     for (const slot of matchingSlots) {
-      const utcDate = new Date(curr.getTime());
-
-      // Check if instance already exists on this UTC date
-      const existing = await prisma.lectureInstance.findFirst({
-        where: {
-          subjectId: slot.subjectId,
-          date: utcDate,
-          startTime: slot.startTime,
-        }
+      recordsToInsert.push({
+        userId,
+        subjectId: slot.subjectId,
+        timetableSlotId: slot.id,
+        date: new Date(curr.getTime()),
+        startTime: slot.startTime,
+        endTime: slot.endTime,
+        status: 'SCHEDULED',
       });
-
-      if (!existing) {
-        await prisma.lectureInstance.create({
-          data: {
-            userId,
-            subjectId: slot.subjectId,
-            timetableSlotId: slot.id,
-            date: utcDate,
-            startTime: slot.startTime,
-            endTime: slot.endTime,
-            status: 'SCHEDULED'
-          }
-        });
-        generatedCount++;
-      }
     }
 
     curr.setUTCDate(curr.getUTCDate() + 1);
   }
 
+  if (recordsToInsert.length === 0) {
+    return { generatedCount: 0, message: 'No lectures to generate.' };
+  }
+
+  // Single fast batch insert with skipDuplicates
+  const result = await prisma.lectureInstance.createMany({
+    data: recordsToInsert,
+    skipDuplicates: true,
+  });
+
   return {
-    generatedCount,
-    message: `Generated ${generatedCount} lectures for the active semester.`
+    generatedCount: result.count,
+    message: `Generated ${result.count} new lectures for the active semester.`,
   };
 }

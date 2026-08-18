@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import { fetchJson, invalidateCache } from '@/lib/api-client';
 import {
   format,
   addWeeks,
@@ -162,14 +163,16 @@ export default function WeeklyView() {
 
   const weekDays = [0, 1, 2, 3, 4, 5].map((offset) => addDays(currentWeekStart, offset));
 
-  const fetchLectures = React.useCallback(async () => {
+  const fetchLectures = React.useCallback(async (forceRefresh = false) => {
     try {
       setLoading(true);
       const startDate = format(currentWeekStart, 'yyyy-MM-dd');
       const endDate = format(addDays(currentWeekStart, 6), 'yyyy-MM-dd');
 
-      const res = await fetch(`/api/lectures?startDate=${startDate}&endDate=${endDate}`);
-      const data = await res.json();
+      const data = await fetchJson(`/api/lectures?startDate=${startDate}&endDate=${endDate}`, {
+        forceRefresh,
+        ttl: 5000,
+      });
       if (data.lectures) setLectures(data.lectures);
     } catch (err) {
       console.error('Failed to fetch lectures', err);
@@ -178,10 +181,9 @@ export default function WeeklyView() {
     }
   }, [currentWeekStart]);
 
-  const fetchOverallHealth = React.useCallback(async () => {
+  const fetchOverallHealth = React.useCallback(async (forceRefresh = false) => {
     try {
-      const res = await fetch('/api/subjects');
-      const data = await res.json();
+      const data = await fetchJson('/api/subjects', { forceRefresh, ttl: 5000 });
       if (data.subjects && data.subjects.length > 0) {
         let totalCounted = 0, totalAttended = 0, totalBunkable = 0, totalMustAttend = 0;
         data.subjects.forEach((s: any) => {
@@ -210,39 +212,45 @@ export default function WeeklyView() {
   }, [fetchLectures, fetchOverallHealth]);
 
   const handleStatusChange = async (id: string, nextStatus: Lecture['status']) => {
+    // Instant optimistic update
     setLectures((prev) =>
       prev.map((lec) => (lec.id === id ? { ...lec, status: nextStatus } : lec))
     );
     try {
+      invalidateCache('/api/lectures');
+      invalidateCache('/api/subjects');
       const response = await fetch('/api/lectures', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id, status: nextStatus }),
       });
       if (!response.ok) throw new Error('Unable to update attendance.');
-      fetchOverallHealth();
+      fetchOverallHealth(true);
     } catch {
-      fetchLectures();
+      fetchLectures(true);
     }
   };
 
   const handleBulkStatusChange = async (dayDate: Date, status: Lecture['status']) => {
     const formatted = format(dayDate, 'yyyy-MM-dd');
+    // Instant optimistic update
     setLectures((prev) =>
       prev.map((lec) =>
         isSameDay(new Date(lec.date), dayDate) ? { ...lec, status } : lec
       )
     );
     try {
+      invalidateCache('/api/lectures');
+      invalidateCache('/api/subjects');
       const response = await fetch('/api/lectures', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ date: formatted, status }),
       });
       if (!response.ok) throw new Error('Unable to update attendance.');
-      fetchOverallHealth();
+      fetchOverallHealth(true);
     } catch {
-      fetchLectures();
+      fetchLectures(true);
     }
   };
 
