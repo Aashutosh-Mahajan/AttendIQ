@@ -37,6 +37,7 @@ export async function GET() {
 
     const activeSemester = await prisma.semester.findFirst({
       where: { userId: user.id, isActive: true },
+      orderBy: { createdAt: 'desc' },
     });
 
     if (!activeSemester) return NextResponse.json({ slots: [] });
@@ -66,7 +67,10 @@ export async function POST(req: Request) {
     const body = await req.json();
     const { subjectId, subjectName, dayOfWeek, startTime, endTime, room } = body;
 
-    const activeSemester = await prisma.semester.findFirst({ where: { userId: user.id, isActive: true } });
+    const activeSemester = await prisma.semester.findFirst({
+      where: { userId: user.id, isActive: true },
+      orderBy: { createdAt: 'desc' },
+    });
     if (!activeSemester) return NextResponse.json({ error: 'Create a semester before adding lectures.' }, { status: 400 });
     const parsedDayOfWeek = parseDayOfWeek(dayOfWeek);
     if (parsedDayOfWeek === null) return NextResponse.json({ error: 'Choose a valid day of the week.' }, { status: 400 });
@@ -131,7 +135,10 @@ export async function PUT(req: Request) {
       return NextResponse.json({ error: 'Enter a subject name and a valid time range.' }, { status: 400 });
     }
 
-    const activeSemester = await prisma.semester.findFirst({ where: { userId: user.id, isActive: true } });
+    const activeSemester = await prisma.semester.findFirst({
+      where: { userId: user.id, isActive: true },
+      orderBy: { createdAt: 'desc' },
+    });
     if (!activeSemester) return NextResponse.json({ error: 'No active semester found.' }, { status: 400 });
     const current = await prisma.timetableSlot.findFirst({ where: { id, userId: user.id, subject: { semesterId: activeSemester.id } } });
     if (!current) return NextResponse.json({ error: 'Timetable slot not found.' }, { status: 404 });

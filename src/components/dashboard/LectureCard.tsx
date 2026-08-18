@@ -1,6 +1,6 @@
 'use client';
 
-import { CheckCircle2, Clock, Sun, XCircle } from 'lucide-react';
+import { CheckCircle2, Clock, Sun, XCircle, CalendarCheck } from 'lucide-react';
 
 export interface Lecture {
   id: string;
@@ -14,25 +14,51 @@ export interface Lecture {
 }
 
 const statusAppearance = {
-  ATTENDED: { label: 'Attended', className: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/40', icon: CheckCircle2 },
-  MISSED: { label: 'Missed', className: 'bg-rose-500/15 text-rose-300 border-rose-500/40', icon: XCircle },
-  HOLIDAY: { label: 'Holiday', className: 'bg-amber-500/15 text-amber-300 border-amber-500/40', icon: Sun },
-  SCHEDULED: { label: 'Mark attendance', className: 'bg-white/5 text-gray-300 border-white/10', icon: Clock },
+  ATTENDED: { label: 'Attended', className: 'ink-stamp ink-stamp-attended', icon: CheckCircle2 },
+  MISSED: { label: 'Missed', className: 'ink-stamp ink-stamp-missed', icon: XCircle },
+  HOLIDAY: { label: 'Holiday', className: 'ink-stamp ink-stamp-holiday', icon: Sun },
+  SCHEDULED: { label: 'Mark', className: 'ink-stamp ink-stamp-scheduled', icon: Clock },
 };
 
 export default function LectureCard({ lecture, onOpen }: { lecture: Lecture; onOpen: (lecture: Lecture) => void }) {
   const appearance = statusAppearance[lecture.status];
   const Icon = appearance.icon;
-  return <button onClick={() => onOpen(lecture)} className="w-full text-left glass-card rounded-xl p-3.5 relative group transition-all duration-200 hover:-translate-y-0.5 hover:border-indigo-500/40" style={{ borderLeftWidth: '3px', borderLeftColor: lecture.subject.color || '#6366f1' }}>
-    <div className="space-y-2">
-      <span className="font-semibold text-[13px] text-white leading-tight block break-words group-hover:text-cyan-200">{lecture.subject.name}</span>
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-2 min-w-0">
-          {lecture.subject.code && <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-md bg-white/8 text-gray-400">{lecture.subject.code}</span>}
-          <span className="flex items-center gap-1 text-[11px] text-gray-500 whitespace-nowrap"><Clock className="h-3 w-3" />{lecture.startTime} – {lecture.endTime}</span>
+
+  return (
+    <button
+      onClick={() => onOpen(lecture)}
+      className="w-full text-left paper-card rounded-xl p-3 relative group transition-all duration-150 hover:-translate-y-0.5 hover:border-white/20 border border-white/[0.08] shadow-paper-sm overflow-hidden"
+    >
+      {/* Left Ink Color Spine */}
+      <span
+        className="absolute left-0 top-0 bottom-0 w-1 opacity-90"
+        style={{ backgroundColor: lecture.subject.color || '#94a3b8' }}
+      />
+
+      <div className="pl-1.5 space-y-1.5">
+        <div className="flex items-start justify-between gap-1.5">
+          <span className="font-semibold text-xs text-white leading-tight block break-words group-hover:text-stone-200">
+            {lecture.subject.name}
+          </span>
+          {lecture.subject.code && (
+            <span className="shrink-0 text-[9px] font-mono px-1 py-0.2 rounded bg-white/5 text-paper-400">
+              {lecture.subject.code}
+            </span>
+          )}
         </div>
-        <span className={`flex items-center gap-1.5 shrink-0 px-2 py-1.5 rounded-lg text-[10px] font-semibold border ${appearance.className}`}><Icon className="h-3.5 w-3.5" /><span>{appearance.label}</span></span>
+
+        <div className="flex items-center justify-between gap-2 pt-0.5">
+          <span className="flex items-center gap-1 font-mono text-[10px] text-paper-400">
+            <Clock className="h-3 w-3" />
+            {lecture.startTime} – {lecture.endTime}
+          </span>
+
+          <span className={appearance.className}>
+            <Icon className="h-3 w-3" />
+            <span>{appearance.label}</span>
+          </span>
+        </div>
       </div>
-    </div>
-  </button>;
+    </button>
+  );
 }

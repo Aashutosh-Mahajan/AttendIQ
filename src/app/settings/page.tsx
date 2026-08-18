@@ -1,13 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Bell, Check, LockKeyhole, Settings, UserRound, Loader2, KeyRound, Eye, EyeOff, Mail, ShieldCheck } from 'lucide-react';
 import { createSupabaseBrowserClient } from '@/lib/auth/client';
 
 type PasswordStep = 'idle' | 'otp_sent' | 'set_password';
 
 export default function SettingsPage() {
-  const supabase = createSupabaseBrowserClient();
+  const supabase = React.useMemo(() => createSupabaseBrowserClient(), []);
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -52,7 +52,7 @@ export default function SettingsPage() {
       setLoading(false);
     };
     loadSettings();
-  }, []);
+  }, [supabase]);
 
   // Resend cooldown countdown
   useEffect(() => {
@@ -120,7 +120,6 @@ export default function SettingsPage() {
         type: 'recovery',
       });
       if (error) { setPasswordError(error.message || 'Invalid or expired code.'); return; }
-      // OTP verified — move to password entry
       setPasswordStep('set_password');
     } finally {
       setPasswordLoading(false);
@@ -161,102 +160,120 @@ export default function SettingsPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="h-8 w-8 rounded-full border-2 border-indigo-500 border-t-transparent animate-spin" />
+        <div className="h-8 w-8 rounded-full border-2 border-white/20 border-t-white animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 max-w-4xl">
+    <div className="space-y-6 max-w-3xl">
       {/* Header */}
-      <div className="glass-card p-5 rounded-2xl flex items-center gap-4 border border-white/10">
-        <div className="h-12 w-12 rounded-xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400">
-          <Settings className="h-6 w-6" />
-        </div>
-        <div>
-          <h2 className="text-xl font-bold text-white">Settings</h2>
-          <p className="text-xs text-gray-400">Manage your profile and everyday app preferences.</p>
+      <div className="paper-card p-5 rounded-2xl flex items-center justify-between border border-white/10 shadow-paper-sm">
+        <div className="flex items-center gap-3.5">
+          <div className="h-10 w-10 rounded-xl bg-white/[0.05] border border-white/10 flex items-center justify-center text-white shrink-0">
+            <Settings className="h-4 w-4" />
+          </div>
+          <div>
+            <h2 className="text-lg font-bold text-white tracking-tight">Account & Application Preferences</h2>
+            <p className="text-xs text-paper-400 font-light mt-0.5">Manage user profile, display preferences, and authentication security.</p>
+          </div>
         </div>
       </div>
 
       <div className="space-y-6">
         {/* Profile & Preferences */}
         <form onSubmit={saveSettings} className="space-y-6">
-          <section className="glass-card p-6 rounded-2xl border border-white/10 space-y-5">
-            <div className="flex items-center gap-2">
-              <UserRound className="h-4 w-4 text-cyan-400" />
-              <h3 className="font-bold text-white">Profile</h3>
+          <section className="paper-card p-6 rounded-2xl border border-white/10 shadow-paper-sm space-y-5">
+            <div className="flex items-center gap-2 border-b border-white/[0.08] pb-3">
+              <UserRound className="h-4 w-4 text-paper-400" />
+              <h3 className="font-bold text-sm text-white">Profile Identity</h3>
             </div>
             <div className="grid sm:grid-cols-2 gap-4 text-xs">
               <div>
-                <label className="block text-gray-400 mb-1">Display name</label>
+                <label className="block text-[11px] font-mono text-paper-400 uppercase tracking-wider mb-1">Display Name</label>
                 <input
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="Your name"
-                  className="w-full p-2.5 rounded-xl bg-[#0b0f17] border border-white/10 text-white focus:outline-none focus:border-indigo-500"
+                  placeholder="Your full name"
+                  className="w-full p-3 rounded-xl bg-white/[0.03] border border-white/10 text-white placeholder-paper-400 focus:outline-none focus:border-white/30 text-xs"
                 />
               </div>
               <div>
-                <label className="block text-gray-400 mb-1">Email address</label>
+                <label className="block text-[11px] font-mono text-paper-400 uppercase tracking-wider mb-1">Email Address</label>
                 <input
                   type="email"
                   value={email}
                   readOnly
-                  className="w-full p-2.5 rounded-xl bg-[#0b0f17] border border-white/10 text-gray-500 cursor-not-allowed focus:outline-none"
+                  className="w-full p-3 rounded-xl bg-white/[0.01] border border-white/5 text-paper-400 cursor-not-allowed font-mono text-xs focus:outline-none"
                 />
-                <p className="text-[10px] text-gray-600 mt-1">Email cannot be changed.</p>
+                <p className="text-[10px] font-mono text-paper-500 mt-1">Verified account credential.</p>
               </div>
             </div>
           </section>
 
-          <section className="glass-card p-6 rounded-2xl border border-white/10 space-y-4">
-            <div className="flex items-center gap-2">
-              <Bell className="h-4 w-4 text-cyan-400" />
-              <h3 className="font-bold text-white">Preferences</h3>
+          <section className="paper-card p-6 rounded-2xl border border-white/10 shadow-paper-sm space-y-4">
+            <div className="flex items-center gap-2 border-b border-white/[0.08] pb-3">
+              <Bell className="h-4 w-4 text-paper-400" />
+              <h3 className="font-bold text-sm text-white">Application Preferences</h3>
             </div>
-            <label className="flex items-center justify-between gap-4 p-3 rounded-xl bg-white/[0.03] border border-white/5 cursor-pointer">
+            <label className="flex items-center justify-between gap-4 p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.06] hover:border-white/10 cursor-pointer transition-colors">
               <div>
-                <p className="text-sm font-medium text-white">Attendance reminders</p>
-                <p className="text-xs text-gray-500 mt-0.5">Keep the weekly attendance checklist visible.</p>
+                <p className="text-xs font-bold text-white">Attendance Margins Indicator</p>
+                <p className="text-[11px] text-paper-400 mt-0.5 font-light">Show real-time safe bunk / must attend pills on the dashboard toolbar.</p>
               </div>
-              <input type="checkbox" checked={reminders} onChange={(e) => setReminders(e.target.checked)} className="h-4 w-4 accent-indigo-500" />
+              <input
+                type="checkbox"
+                checked={reminders}
+                onChange={(e) => setReminders(e.target.checked)}
+                className="h-4 w-4 rounded accent-white cursor-pointer"
+              />
             </label>
-            <label className="flex items-center justify-between gap-4 p-3 rounded-xl bg-white/[0.03] border border-white/5 cursor-pointer">
+            <label className="flex items-center justify-between gap-4 p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.06] hover:border-white/10 cursor-pointer transition-colors">
               <div>
-                <p className="text-sm font-medium text-white">Compact timetable cards</p>
-                <p className="text-xs text-gray-500 mt-0.5">Use denser cards for busy weekly schedules.</p>
+                <p className="text-xs font-bold text-white">Dense Timetable Slot View</p>
+                <p className="text-[11px] text-paper-400 mt-0.5 font-light">Use compact spacing for full daily schedules with many classes.</p>
               </div>
-              <input type="checkbox" checked={compactView} onChange={(e) => setCompactView(e.target.checked)} className="h-4 w-4 accent-indigo-500" />
+              <input
+                type="checkbox"
+                checked={compactView}
+                onChange={(e) => setCompactView(e.target.checked)}
+                className="h-4 w-4 rounded accent-white cursor-pointer"
+              />
             </label>
           </section>
 
-          <section className="glass-card p-5 rounded-2xl border border-white/10 flex gap-3 text-xs text-gray-400">
-            <LockKeyhole className="h-4 w-4 text-indigo-300 shrink-0" />
-            <p>Semester dates and recurring lectures are managed in the Timetable Builder, so Settings stays focused on your account and preferences.</p>
+          <section className="paper-card p-4 rounded-2xl border border-white/10 flex gap-3 text-xs text-paper-400">
+            <LockKeyhole className="h-4 w-4 text-stone-300 shrink-0 mt-0.5" />
+            <p className="font-light leading-relaxed">
+              Semester schedules and recurring course lectures are configured inside the Timetable Builder, keeping your settings clean.
+            </p>
           </section>
 
-          {error && <p className="p-3 rounded-xl bg-rose-500/20 text-rose-300 text-xs">{error}</p>}
+          {error && (
+            <p className="p-3 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-200 text-xs font-mono">
+              {error}
+            </p>
+          )}
 
           <button
             disabled={saving}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-60 text-white font-medium text-xs shadow-md shadow-indigo-600/30 transition-colors"
+            className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-white hover:bg-stone-200 disabled:opacity-60 text-paper-950 font-bold text-xs uppercase tracking-wider font-mono shadow-paper-sm transition-all"
           >
-            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : saved ? <Check className="h-4 w-4" /> : null}
-            {saving ? 'Saving…' : saved ? 'Saved!' : 'Save settings'}
+            {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : saved ? <Check className="h-3.5 w-3.5" /> : null}
+            {saving ? 'Saving Changes…' : saved ? 'Preferences Saved' : 'Save Preferences'}
           </button>
         </form>
 
         {/* ── Security / Change Password ── */}
-        <section className="glass-card p-6 rounded-2xl border border-white/10 space-y-5">
-          <div className="flex items-center gap-2">
-            <KeyRound className="h-4 w-4 text-cyan-400" />
-            <h3 className="font-bold text-white">Security</h3>
+        <section className="paper-card p-6 rounded-2xl border border-white/10 shadow-paper-sm space-y-5">
+          <div className="flex items-center gap-2 border-b border-white/[0.08] pb-3">
+            <KeyRound className="h-4 w-4 text-paper-400" />
+            <h3 className="font-bold text-sm text-white">Security & Password</h3>
           </div>
 
           {/* Success banner */}
           {passwordSuccess && (
-            <div className="flex items-center gap-2 p-3 rounded-xl bg-emerald-500/15 border border-emerald-500/25 text-emerald-400 text-xs">
+            <div className="flex items-center gap-2 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-xs font-mono">
               <ShieldCheck className="h-4 w-4 shrink-0" />
               {passwordSuccess}
             </div>
@@ -264,23 +281,25 @@ export default function SettingsPage() {
 
           {/* Error banner */}
           {passwordError && (
-            <p className="p-3 rounded-xl bg-rose-500/20 text-rose-300 text-xs">{passwordError}</p>
+            <p className="p-3 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-200 text-xs font-mono">
+              {passwordError}
+            </p>
           )}
 
           {/* ── IDLE ── */}
           {passwordStep === 'idle' && (
             <div className="space-y-3">
-              <p className="text-sm text-gray-400">
-                To change your password we&apos;ll send a verification code to{' '}
-                <span className="text-white font-medium">{maskedEmail}</span>.
+              <p className="text-xs text-stone-300 font-light leading-relaxed">
+                To update your password, we&apos;ll dispatch a single-use verification code to{' '}
+                <span className="text-white font-mono font-semibold">{maskedEmail}</span>.
               </p>
               <button
                 onClick={sendPasswordOtp}
                 disabled={passwordLoading}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/[0.05] hover:bg-white/[0.08] border border-white/10 text-white font-medium text-xs transition-colors disabled:opacity-50"
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 text-white font-bold text-xs font-mono uppercase tracking-wider transition-colors disabled:opacity-50"
               >
-                {passwordLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
-                {passwordLoading ? 'Sending…' : 'Send verification code'}
+                {passwordLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Mail className="h-3.5 w-3.5" />}
+                {passwordLoading ? 'Dispatching…' : 'Send Verification OTP'}
               </button>
             </div>
           )}
@@ -288,22 +307,22 @@ export default function SettingsPage() {
           {/* ── OTP SENT — enter code ── */}
           {passwordStep === 'otp_sent' && (
             <form onSubmit={verifyOtp} className="space-y-4 max-w-sm">
-              <div className="flex items-center gap-2 p-3 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-xs text-indigo-300">
-                <Mail className="h-4 w-4 shrink-0" />
-                <span>A 6-digit code was sent to <strong>{maskedEmail}</strong>. Check your inbox.</span>
+              <div className="flex items-center gap-2 p-3 rounded-xl bg-white/[0.03] border border-white/10 text-xs text-paper-300">
+                <Mail className="h-4 w-4 shrink-0 text-paper-400" />
+                <span>6-digit OTP dispatched to <strong className="text-white font-mono">{maskedEmail}</strong>.</span>
               </div>
 
               <div>
-                <label className="block text-xs text-gray-400 mb-1.5">Verification code</label>
+                <label className="block text-[11px] font-mono text-paper-400 uppercase tracking-wider mb-1.5">Verification Code</label>
                 <input
                   required
                   inputMode="numeric"
                   maxLength={6}
-                  placeholder="_ _ _ _ _ _"
+                  placeholder="······"
                   value={otp}
                   onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
                   autoFocus
-                  className="w-full p-3 rounded-xl bg-[#0b0f17] border border-indigo-500/40 text-white placeholder-gray-700 tracking-[0.6em] text-center text-xl font-bold focus:outline-none focus:border-indigo-500"
+                  className="w-full p-3 rounded-xl bg-white/[0.03] border border-white/20 text-white placeholder-paper-500 tracking-[0.5em] text-center text-lg font-mono font-bold focus:outline-none focus:border-white/40"
                 />
               </div>
 
@@ -311,29 +330,29 @@ export default function SettingsPage() {
                 <button
                   type="submit"
                   disabled={passwordLoading || otp.length < 6}
-                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-medium text-xs transition-colors"
+                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white hover:bg-stone-200 text-paper-950 font-bold text-xs font-mono uppercase tracking-wider shadow-paper-sm transition-all disabled:opacity-50"
                 >
-                  {passwordLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                  {passwordLoading ? 'Verifying…' : 'Verify code'}
+                  {passwordLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                  {passwordLoading ? 'Verifying…' : 'Verify OTP'}
                 </button>
                 <button
                   type="button"
                   onClick={resetPasswordState}
-                  className="px-4 py-2 rounded-xl bg-white/[0.05] hover:bg-white/[0.08] text-white font-medium text-xs transition-colors"
+                  className="px-4 py-2.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-paper-300 text-xs font-mono uppercase tracking-wider transition-colors"
                 >
                   Cancel
                 </button>
               </div>
 
-              <p className="text-xs text-gray-500">
+              <p className="text-[11px] font-mono text-paper-400">
                 Didn&apos;t receive it?{' '}
                 <button
                   type="button"
                   onClick={resendOtp}
                   disabled={resendCooldown > 0}
-                  className="text-indigo-400 hover:text-indigo-300 disabled:opacity-40 underline-offset-2 hover:underline"
+                  className="text-white hover:underline disabled:opacity-40"
                 >
-                  {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend code'}
+                  {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend OTP'}
                 </button>
               </p>
             </form>
@@ -342,9 +361,9 @@ export default function SettingsPage() {
           {/* ── SET PASSWORD — after OTP verified ── */}
           {passwordStep === 'set_password' && (
             <form onSubmit={submitNewPassword} className="space-y-4 max-w-sm">
-              <div className="flex items-center gap-2 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-300">
+              <div className="flex items-center gap-2 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-300 font-mono">
                 <ShieldCheck className="h-4 w-4 shrink-0" />
-                <span>Identity verified. Choose a new password.</span>
+                <span>Identity verified. Enter new password.</span>
               </div>
 
               <div className="relative">
@@ -356,13 +375,12 @@ export default function SettingsPage() {
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   autoFocus
-                  className="w-full p-2.5 pr-10 rounded-xl bg-[#0b0f17] border border-white/10 text-white focus:outline-none focus:border-indigo-500 text-sm"
+                  className="w-full p-3 pr-10 rounded-xl bg-white/[0.03] border border-white/10 text-white placeholder-paper-400 focus:outline-none focus:border-white/30 text-xs"
                 />
                 <button
-                  suppressHydrationWarning
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-2.5 text-gray-400 hover:text-white"
+                  className="absolute right-3 top-3 text-paper-400 hover:text-white"
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
@@ -375,22 +393,22 @@ export default function SettingsPage() {
                 placeholder="Confirm new password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full p-2.5 rounded-xl bg-[#0b0f17] border border-white/10 text-white focus:outline-none focus:border-indigo-500 text-sm"
+                className="w-full p-3 rounded-xl bg-white/[0.03] border border-white/10 text-white placeholder-paper-400 focus:outline-none focus:border-white/30 text-xs"
               />
 
               <div className="flex gap-2">
                 <button
                   type="submit"
                   disabled={passwordLoading}
-                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-medium text-xs shadow-md shadow-indigo-600/30 transition-colors"
+                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white hover:bg-stone-200 text-paper-950 font-bold text-xs font-mono uppercase tracking-wider shadow-paper-sm transition-all disabled:opacity-50"
                 >
-                  {passwordLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                  {passwordLoading ? 'Updating…' : 'Update password'}
+                  {passwordLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                  {passwordLoading ? 'Updating…' : 'Update Password'}
                 </button>
                 <button
                   type="button"
                   onClick={resetPasswordState}
-                  className="px-4 py-2 rounded-xl bg-white/[0.05] hover:bg-white/[0.08] text-white font-medium text-xs transition-colors"
+                  className="px-4 py-2.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-paper-300 text-xs font-mono uppercase tracking-wider transition-colors"
                 >
                   Cancel
                 </button>

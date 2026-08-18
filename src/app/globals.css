@@ -3,9 +3,16 @@
 @import "tailwindcss/utilities";
 
 :root {
-  --color-obsidian-bg: #0b0f17;
-  --color-card-bg: rgba(20, 28, 45, 0.7);
-  --color-border: rgba(255, 255, 255, 0.08);
+  --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  --font-serif: 'Instrument Serif', Georgia, serif;
+  --font-mono: 'JetBrains Mono', monospace;
+
+  --color-paper-bg: #0c0d10;
+  --color-paper-card: rgba(22, 24, 29, 0.85);
+  --color-paper-border: rgba(255, 255, 255, 0.08);
+  --color-ink-primary: #f5f3ef;
+  --color-ink-muted: #8e94a0;
+  --color-ink-faint: #555b68;
 }
 
 * {
@@ -14,43 +21,129 @@
 }
 
 body {
-  background-color: var(--color-obsidian-bg);
-  color: #e5e7eb;
-  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background-color: var(--color-paper-bg);
+  color: var(--color-ink-primary);
+  font-family: var(--font-sans);
   overflow-x: hidden;
   min-height: 100vh;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.015em;
 }
 
-/* ─── Glassmorphism ─── */
-.glass-card {
-  background: rgba(17, 24, 39, 0.6);
+/* ─── Paper Cards & Panels ─── */
+.paper-card {
+  background: rgba(18, 20, 25, 0.8);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow:
-    0 4px 24px 0 rgba(0, 0, 0, 0.35),
-    inset 0 1px 0 0 rgba(255, 255, 255, 0.03);
+    0 1px 2px 0 rgba(0, 0, 0, 0.25),
+    0 8px 24px -4px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.04);
+}
+
+.paper-card-hover {
+  transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.paper-card-hover:hover {
+  background: rgba(24, 27, 34, 0.95);
+  border-color: rgba(255, 255, 255, 0.16);
+  transform: translateY(-1px);
+  box-shadow:
+    0 4px 12px 0 rgba(0, 0, 0, 0.35),
+    0 12px 32px -4px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.06);
+}
+
+/* ─── Backwards Compatibility for glass-card aliases ─── */
+.glass-card {
+  background: rgba(18, 20, 25, 0.8);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow:
+    0 1px 2px 0 rgba(0, 0, 0, 0.25),
+    0 8px 24px -4px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.04);
 }
 
 .glass-card-hover {
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 .glass-card-hover:hover {
-  background: rgba(22, 30, 48, 0.85);
-  border-color: rgba(99, 102, 241, 0.2);
+  background: rgba(24, 27, 34, 0.95);
+  border-color: rgba(255, 255, 255, 0.16);
+  transform: translateY(-1px);
   box-shadow:
-    0 8px 32px 0 rgba(0, 0, 0, 0.45),
-    0 0 16px -4px rgba(99, 102, 241, 0.15),
-    inset 0 1px 0 0 rgba(255, 255, 255, 0.05);
+    0 4px 12px 0 rgba(0, 0, 0, 0.35),
+    0 12px 32px -4px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.06);
 }
 
 .glass-nav {
-  background: rgba(11, 15, 23, 0.92);
+  background: rgba(12, 13, 16, 0.92);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.paper-nav {
+  background: rgba(12, 13, 16, 0.92);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* ─── Stationery Ledger Grid Background ─── */
+.ledger-grid-bg {
+  background-size: 28px 28px;
+  background-image: 
+    linear-gradient(to right, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+}
+
+.ledger-dots-bg {
+  background-size: 20px 20px;
+  background-image: radial-gradient(circle, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+}
+
+/* ─── Ink Stamp Badges ─── */
+.ink-stamp {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 9999px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  border-width: 1px;
+}
+
+.ink-stamp-attended {
+  background-color: rgba(21, 128, 61, 0.12);
+  color: #4ade80;
+  border-color: rgba(34, 197, 94, 0.25);
+}
+
+.ink-stamp-missed {
+  background-color: rgba(194, 65, 12, 0.12);
+  color: #fb923c;
+  border-color: rgba(249, 115, 22, 0.25);
+}
+
+.ink-stamp-holiday {
+  background-color: rgba(180, 83, 9, 0.12);
+  color: #fbbf24;
+  border-color: rgba(245, 158, 11, 0.25);
+}
+
+.ink-stamp-scheduled {
+  background-color: rgba(255, 255, 255, 0.04);
+  color: #94a3b8;
+  border-color: rgba(255, 255, 255, 0.08);
 }
 
 /* ─── Animations ─── */
@@ -60,12 +153,7 @@ body {
 }
 
 .animate-in {
-  animation: fade-in 0.15s ease-out forwards;
-}
-
-@keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
+  animation: fade-in 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 /* ─── Scrollbar ─── */
@@ -79,38 +167,40 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.1);
   border-radius: 999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.2);
 }
 
 /* ─── Selection ─── */
 ::selection {
-  background-color: rgba(99, 102, 241, 0.35);
-  color: #c7d2fe;
+  background-color: rgba(245, 242, 235, 0.2);
+  color: #ffffff;
 }
 
 /* ─── Focus rings ─── */
 *:focus-visible {
-  outline: 2px solid rgba(99, 102, 241, 0.5);
+  outline: 1.5px solid rgba(255, 255, 255, 0.4);
   outline-offset: 2px;
   border-radius: 8px;
 }
 
-/* ─── Form inputs (dark theme) ─── */
+/* ─── Form inputs ─── */
 input[type="date"]::-webkit-calendar-picker-indicator,
 input[type="time"]::-webkit-calendar-picker-indicator {
-  filter: invert(0.7);
+  filter: invert(0.85);
+  opacity: 0.6;
+  cursor: pointer;
 }
 
 select {
   appearance: none;
-  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238e94a0' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
   background-repeat: no-repeat;
   background-position: right 0.75rem center;
-  background-size: 1em;
-  padding-right: 2.5rem;
+  background-size: 0.9em;
+  padding-right: 2.25rem;
 }

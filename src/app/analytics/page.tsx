@@ -2,11 +2,112 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { BarChart3 } from 'lucide-react';
+import { BarChart3, ArrowRight } from 'lucide-react';
 import AttendanceCharts, { SubjectAnalytics, TrendPoint } from '@/components/analytics/AttendanceCharts';
 
 export default function AnalyticsPage() {
-  const [subjects, setSubjects] = useState<SubjectAnalytics[]>([]), [trend, setTrend] = useState<TrendPoint[]>([]), [overall, setOverall] = useState(0), [loading, setLoading] = useState(true), [hasSemester, setHasSemester] = useState<boolean | null>(null);
-  useEffect(() => { const load = async () => { try { const [subjectRes, termRes] = await Promise.all([fetch('/api/subjects'), fetch('/api/semesters')]); const subjectData = await subjectRes.json(), termData = await termRes.json(); setHasSemester(Boolean(termData.activeSemester)); const raw = subjectData.subjects ?? []; let attended = 0, counted = 0; const weekly = new Map<string, { attended: number; counted: number }>(); const formatted = raw.map((subject: any) => { const stats = subject.stats; attended += stats?.attendedCount ?? 0; counted += stats?.countedLectures ?? 0; (subject.lectureInstances ?? []).forEach((lecture: any) => { if (lecture.status !== 'ATTENDED' && lecture.status !== 'MISSED') return; const date = new Date(lecture.date); const monday = new Date(date); monday.setDate(date.getDate() - ((date.getDay() + 6) % 7)); const key = monday.toISOString().slice(0, 10); const point = weekly.get(key) ?? { attended: 0, counted: 0 }; point.counted++; if (lecture.status === 'ATTENDED') point.attended++; weekly.set(key, point); }); return { name: subject.name, code: subject.code, color: subject.color, percentage: stats?.percentage ?? 0, targetPercentage: subject.targetPercentage, attended: stats?.attendedCount ?? 0, total: stats?.countedLectures ?? 0 }; }); setSubjects(formatted); setOverall(counted ? Math.round((attended / counted) * 1000) / 10 : 0); setTrend([...weekly.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([week, point]) => ({ week: new Date(`${week}T00:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }), percentage: Math.round((point.attended / point.counted) * 1000) / 10 }))); } finally { setLoading(false); } }; load(); }, []);
-  return <div className="space-y-6"><div className="glass-card p-5 rounded-2xl flex items-center gap-4 border border-white/10"><div className="h-12 w-12 rounded-xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400"><BarChart3 className="h-6 w-6" /></div><div><h2 className="text-xl font-bold text-white">Analytics & Attendance Insights</h2><p className="text-xs text-gray-400">Real attendance performance for the active term.</p></div></div>{loading ? <div className="h-96 rounded-2xl bg-white/5 animate-pulse" /> : !hasSemester ? <div className="glass-card rounded-2xl p-12 text-center"><h3 className="text-lg font-bold text-white">Create a term to see analytics</h3><p className="text-sm text-gray-400 mt-2 mb-5">Analytics are calculated from attendance inside your active term.</p><Link href="/timetable" className="inline-flex px-4 py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-semibold">Go to Timetable Builder</Link></div> : <AttendanceCharts subjects={subjects} overallPercentage={overall} trendData={trend} />}</div>;
+  const [subjects, setSubjects] = useState<SubjectAnalytics[]>([]);
+  const [trend, setTrend] = useState<TrendPoint[]>([]);
+  const [overall, setOverall] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [hasSemester, setHasSemester] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const [subjectRes, termRes] = await Promise.all([fetch('/api/subjects'), fetch('/api/semesters')]);
+        const subjectData = await subjectRes.json();
+        const termData = await termRes.json();
+        setHasSemester(Boolean(termData.activeSemester));
+        const raw = subjectData.subjects ?? [];
+
+        let attended = 0, counted = 0;
+        const weekly = new Map<string, { attended: number; counted: number }>();
+
+        const formatted = raw.map((subject: any) => {
+          const stats = subject.stats;
+          attended += stats?.attendedCount ?? 0;
+          counted += stats?.countedLectures ?? 0;
+
+          (subject.lectureInstances ?? []).forEach((lecture: any) => {
+            if (lecture.status !== 'ATTENDED' && lecture.status !== 'MISSED') return;
+            const date = new Date(lecture.date);
+            const monday = new Date(date);
+            monday.setDate(date.getDate() - ((date.getDay() + 6) % 7));
+            const key = monday.toISOString().slice(0, 10);
+            const point = weekly.get(key) ?? { attended: 0, counted: 0 };
+            point.counted++;
+            if (lecture.status === 'ATTENDED') point.attended++;
+            weekly.set(key, point);
+          });
+
+          return {
+            name: subject.name,
+            code: subject.code,
+            color: subject.color,
+            percentage: stats?.percentage ?? 0,
+            targetPercentage: subject.targetPercentage,
+            attended: stats?.attendedCount ?? 0,
+            total: stats?.countedLectures ?? 0,
+          };
+        });
+
+        setSubjects(formatted);
+        setOverall(counted ? Math.round((attended / counted) * 1000) / 10 : 0);
+        setTrend(
+          [...weekly.entries()]
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([week, point]) => ({
+              week: new Date(`${week}T00:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
+              percentage: Math.round((point.attended / point.counted) * 1000) / 10,
+            }))
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, []);
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="paper-card p-5 rounded-2xl flex items-center justify-between border border-white/10 shadow-paper-sm">
+        <div className="flex items-center gap-3.5">
+          <div className="h-10 w-10 rounded-xl bg-white/[0.05] border border-white/10 flex items-center justify-center text-white shrink-0">
+            <BarChart3 className="h-4 w-4" />
+          </div>
+          <div>
+            <h2 className="text-lg font-bold text-white tracking-tight">Attendance Analytics & Trends</h2>
+            <p className="text-xs text-paper-400 font-light mt-0.5">Statistical breakdown and weekly momentum across your active term.</p>
+          </div>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="h-96 rounded-2xl paper-card border border-white/5 animate-pulse" />
+      ) : !hasSemester ? (
+        <div className="paper-card rounded-2xl p-12 text-center border border-white/10 space-y-4 max-w-lg mx-auto">
+          <div className="h-10 w-10 rounded-xl bg-white/[0.04] border border-white/10 flex items-center justify-center mx-auto text-paper-300">
+            <BarChart3 className="h-5 w-5" />
+          </div>
+          <div>
+            <h3 className="text-base font-bold text-white">Create a term to view analytics</h3>
+            <p className="text-xs text-paper-400 mt-1 font-light leading-relaxed">
+              Analytics are computed from real class attendance within your active academic term.
+            </p>
+          </div>
+          <Link
+            href="/timetable"
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white hover:bg-stone-200 text-paper-950 font-bold text-xs uppercase tracking-wider font-mono shadow-paper-sm transition-all"
+          >
+            Go to Timetable Builder
+            <ArrowRight className="h-3.5 w-3.5" />
+          </Link>
+        </div>
+      ) : (
+        <AttendanceCharts subjects={subjects} overallPercentage={overall} trendData={trend} />
+      )}
+    </div>
+  );
 }

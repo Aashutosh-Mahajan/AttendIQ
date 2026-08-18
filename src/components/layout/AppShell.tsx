@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import {
   Calendar,
@@ -13,7 +14,8 @@ import {
   ShieldCheck,
   Menu,
   X,
-  LogOut
+  LogOut,
+  Sparkles,
 } from 'lucide-react';
 import { createSupabaseBrowserClient } from '@/lib/auth/client';
 
@@ -23,7 +25,7 @@ interface AppShellProps {
 
 export default function AppShell({ children }: AppShellProps) {
   const pathname = usePathname();
-  const supabase = createSupabaseBrowserClient();
+  const supabase = React.useMemo(() => createSupabaseBrowserClient(), []);
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [semesterInfo, setSemesterInfo] = useState<{ name: string } | null>(null);
@@ -60,7 +62,7 @@ export default function AppShell({ children }: AppShellProps) {
     }).catch(() => window.location.assign('/login'));
 
     Promise.allSettled([semesterPromise, authPromise]).then(() => setAuthReady(true));
-  }, [pathname, isAuthPage]);
+  }, [pathname, isAuthPage, supabase]);
 
   const logout = async () => {
     await supabase.auth.signOut();
@@ -71,71 +73,80 @@ export default function AppShell({ children }: AppShellProps) {
 
   if (!authReady) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#0b0f17]">
-        <div className="flex flex-col items-center gap-4">
-          <div className="h-10 w-10 rounded-full border-2 border-indigo-500 border-t-transparent animate-spin" />
-          <p className="text-sm text-gray-500 font-medium">Loading...</p>
+      <div className="min-h-screen flex items-center justify-center bg-paper-950">
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-7 w-7 rounded-full border-2 border-white/20 border-t-white animate-spin" />
+          <p className="text-xs text-paper-400 font-mono tracking-wider uppercase">Loading ledger…</p>
         </div>
       </div>
     );
   }
 
   const navItems = [
-    { href: '/dashboard', label: 'Weekly Dashboard', icon: Calendar },
+    { href: '/dashboard', label: 'Weekly Ledger', icon: Calendar },
     { href: '/timetable', label: 'Timetable Builder', icon: Clock },
-    { href: '/subjects', label: 'Subjects & Attendance', icon: BookOpen },
+    { href: '/subjects', label: 'Subjects & Limits', icon: BookOpen },
     { href: '/analytics', label: 'Analytics & Insights', icon: BarChart3 },
-    { href: '/settings', label: 'Settings', icon: Settings },
+    { href: '/settings', label: 'Preferences', icon: Settings },
   ];
 
   return (
-    <div className="min-h-screen flex bg-[#0b0f17] text-gray-100 font-sans selection:bg-indigo-500/30 selection:text-indigo-300">
+    <div className="min-h-screen flex bg-paper-950 text-paper-100 font-sans ledger-grid-bg">
       {/* Sidebar Navigation - Desktop */}
-      <aside className="hidden md:flex flex-col w-64 glass-nav border-r border-white/10 px-5 py-6 fixed inset-y-0 z-30">
+      <aside className="hidden md:flex flex-col w-64 paper-nav border-r border-white/[0.08] px-5 py-6 fixed inset-y-0 z-30">
         {/* Brand Header */}
-        <div className="flex items-center gap-3 px-2 mb-8">
-          <img
-            src="/logo.jpg"
-            alt="AttendIQ Logo"
-            className="h-10 w-10 rounded-xl object-cover ring-1 ring-white/20 shadow-lg shadow-cyan-500/20 bg-white"
-          />
+        <div className="flex items-center gap-3 px-1 mb-7">
+          <div className="relative">
+            <Image
+              src="/logo.jpg"
+              alt="AttendIQ Logo"
+              width={36}
+              height={36}
+              className="h-9 w-9 rounded-xl object-cover ring-1 ring-white/15 bg-white shadow-paper-sm"
+            />
+            <span className="absolute -bottom-1 -right-1 h-3 w-3 rounded-full bg-emerald-500 ring-2 ring-paper-950" />
+          </div>
           <div>
-            <h1 className="font-bold text-xl tracking-tight text-white flex items-center gap-1.5">
-              Attend<span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-cyan-400">IQ</span>
+            <h1 className="font-bold text-lg tracking-tight text-white flex items-center gap-1">
+              Attend<span className="text-stone-300 font-serif italic text-xl tracking-normal">IQ</span>
             </h1>
-            <p className="text-[11px] font-medium text-gray-400">Track Today, Stay Ahead</p>
+            <p className="text-[10px] font-mono tracking-wider uppercase text-paper-400">Attendance Ledger</p>
           </div>
         </div>
 
         {/* Active Semester Badge */}
-        <div className="mb-6 mx-1 p-3 rounded-xl bg-indigo-950/40 border border-indigo-500/20 backdrop-blur-md">
-          <div className="flex items-center justify-between text-xs mb-1">
-            <span className="text-gray-400 font-medium flex items-center gap-1">
-              <ShieldCheck className="h-3.5 w-3.5 text-cyan-400" /> Active Term
+        <div className="mb-5 p-3 rounded-xl bg-white/[0.03] border border-white/[0.08] backdrop-blur-md">
+          <div className="flex items-center justify-between text-[11px] mb-1">
+            <span className="text-paper-400 font-medium flex items-center gap-1.5">
+              <ShieldCheck className="h-3.5 w-3.5 text-stone-300" /> Active Term
             </span>
-            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">LIVE</span>
+            <span className="px-1.5 py-0.2 rounded font-mono text-[9px] font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/25 uppercase tracking-wider">
+              Live
+            </span>
           </div>
-          <p className="text-sm font-semibold text-white truncate">
-            {semesterInfo ? semesterInfo.name : 'No semester yet'}
+          <p className="text-xs font-semibold text-white truncate">
+            {semesterInfo ? semesterInfo.name : 'No active term'}
           </p>
         </div>
 
-        <div className="mb-5 mx-1 flex items-center justify-between gap-2 px-3">
-          <div>
-            <p className="text-[10px] text-gray-500 uppercase tracking-wider">Signed in as</p>
-            <p className="text-sm font-semibold text-white truncate">Hello, {userName}</p>
+        {/* User Badge */}
+        <div className="mb-5 flex items-center justify-between gap-2 px-2.5 py-2 rounded-xl bg-white/[0.02] border border-white/[0.05]">
+          <div className="min-w-0">
+            <p className="text-[9px] font-mono uppercase tracking-widest text-paper-400">Signed in as</p>
+            <p className="text-xs font-medium text-stone-200 truncate">{userName}</p>
           </div>
           <button
             onClick={logout}
-            title="Log out"
-            className="p-2 rounded-lg bg-white/5 hover:bg-rose-500/15 text-gray-400 hover:text-rose-300"
+            title="Sign out"
+            aria-label="Sign out"
+            className="p-1.5 rounded-lg text-paper-400 hover:text-rose-300 hover:bg-rose-500/10 transition-colors"
           >
-            <LogOut className="h-4 w-4" />
+            <LogOut className="h-3.5 w-3.5" />
           </button>
         </div>
 
         {/* Nav Links */}
-        <nav className="flex-1 space-y-1.5">
+        <nav className="flex-1 space-y-1">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = pathname === item.href;
@@ -143,49 +154,52 @@ export default function AppShell({ children }: AppShellProps) {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
+                className={`flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-medium transition-all duration-150 ${
                   isActive
-                    ? 'bg-gradient-to-r from-indigo-600/90 to-indigo-700/80 text-white shadow-md shadow-indigo-600/20 border border-indigo-500/30 font-semibold'
-                    : 'text-gray-400 hover:text-white hover:bg-white/5'
+                    ? 'bg-white/10 text-white shadow-paper-sm border border-white/15 font-semibold'
+                    : 'text-paper-400 hover:text-stone-200 hover:bg-white/[0.04]'
                 }`}
               >
-                <div className="flex items-center gap-3">
-                  <Icon className={`h-4 w-4 ${isActive ? 'text-cyan-300' : 'text-gray-400'}`} />
+                <div className="flex items-center gap-2.5">
+                  <Icon className={`h-4 w-4 ${isActive ? 'text-white' : 'text-paper-400'}`} />
                   <span>{item.label}</span>
                 </div>
-                {isActive && <ChevronRight className="h-4 w-4 text-cyan-300/70" />}
+                {isActive && <ChevronRight className="h-3.5 w-3.5 text-stone-300" />}
               </Link>
             );
           })}
         </nav>
 
         {/* Footer */}
-        <div className="pt-4 mt-auto border-t border-white/10 text-xs text-gray-400 flex items-center justify-between px-2">
-          <span className="flex items-center gap-1.5 text-emerald-400 font-medium">
-            <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>
-            Sync Active
+        <div className="pt-4 mt-auto border-t border-white/[0.08] text-[11px] text-paper-400 flex items-center justify-between px-1">
+          <span className="flex items-center gap-1.5 font-mono text-[10px] text-stone-400">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400"></span>
+            SYNCED
           </span>
-          <span className="text-gray-400 text-[11px]">v1.0.0</span>
+          <span className="font-mono text-[10px] text-paper-400">v1.2</span>
         </div>
       </aside>
 
       {/* Mobile Top Header */}
-      <header className="md:hidden fixed top-0 left-0 right-0 h-16 glass-nav z-40 px-4 flex items-center justify-between border-b border-white/10">
+      <header className="md:hidden fixed top-0 left-0 right-0 h-14 paper-nav z-40 px-4 flex items-center justify-between border-b border-white/[0.08]">
         <div className="flex items-center gap-2.5">
-          <img src="/logo.jpg" alt="AttendIQ Logo" className="h-8 w-8 rounded-lg object-cover bg-white" />
-          <span className="font-bold text-lg text-white">AttendIQ</span>
+          <Image src="/logo.jpg" alt="AttendIQ Logo" width={28} height={28} className="h-7 w-7 rounded-lg object-cover bg-white" />
+          <span className="font-bold text-base text-white tracking-tight">
+            Attend<span className="text-stone-300 font-serif italic">IQ</span>
+          </span>
         </div>
         <button
           onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          className="p-2 rounded-lg bg-white/5 text-gray-300 hover:text-white"
+          className="p-1.5 rounded-lg bg-white/5 text-paper-300 hover:text-white"
+          aria-label="Toggle navigation menu"
         >
-          {mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+          {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
         </button>
       </header>
 
       {/* Mobile Menu Overlay */}
       {mobileMenuOpen && (
-        <div className="md:hidden fixed inset-0 z-30 bg-[#0b0f17]/95 backdrop-blur-xl pt-20 px-6 space-y-3">
+        <div className="md:hidden fixed inset-0 z-30 bg-paper-950/98 backdrop-blur-xl pt-16 px-5 space-y-2">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = pathname === item.href;
@@ -194,28 +208,28 @@ export default function AppShell({ children }: AppShellProps) {
                 key={item.href}
                 href={item.href}
                 onClick={() => setMobileMenuOpen(false)}
-                className={`flex items-center gap-3 px-4 py-3 rounded-xl text-base font-medium ${
-                  isActive ? 'bg-indigo-600 text-white font-semibold' : 'text-gray-300 hover:bg-white/5'
+                className={`flex items-center gap-3 px-3.5 py-3 rounded-xl text-sm font-medium ${
+                  isActive ? 'bg-white/10 text-white font-semibold border border-white/15' : 'text-paper-300 hover:bg-white/5'
                 }`}
               >
-                <Icon className="h-5 w-5" />
+                <Icon className="h-4 w-4" />
                 <span>{item.label}</span>
               </Link>
             );
           })}
           <button
             onClick={logout}
-            className="flex items-center gap-3 px-4 py-3 rounded-xl text-base font-medium text-rose-400 hover:bg-rose-500/10 w-full"
+            className="flex items-center gap-3 px-3.5 py-3 rounded-xl text-sm font-medium text-rose-300 hover:bg-rose-500/10 w-full mt-4 border border-rose-500/20"
           >
-            <LogOut className="h-5 w-5" />
+            <LogOut className="h-4 w-4" />
             <span>Sign out</span>
           </button>
         </div>
       )}
 
       {/* Main Content */}
-      <main className="flex-1 md:pl-64 pt-16 md:pt-0 min-h-screen">
-        <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
+      <main className="flex-1 md:pl-64 pt-14 md:pt-0 min-h-screen">
+        <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 animate-in">
           {children}
         </div>
       </main>

@@ -18,21 +18,35 @@ export async function GET(req: Request) {
     // Auto generate missing lectures up to 21 days ahead
     await generateLecturesForUser(user.id);
 
-    let whereClause: any = { userId: user.id };
+    const activeSemester = await prisma.semester.findFirst({
+      where: { userId: user.id, isActive: true },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (!activeSemester) {
+      return NextResponse.json({ lectures: [] });
+    }
+
+    let whereClause: any = {
+      userId: user.id,
+      subject: { semesterId: activeSemester.id },
+    };
 
     if (Boolean(startStr) !== Boolean(endStr)) {
       return NextResponse.json({ error: 'Provide both startDate and endDate.' }, { status: 400 });
     }
 
     if (startStr && endStr) {
-      const startDate = new Date(startStr);
-      const endDate = new Date(endStr);
+      const startClean = startStr.slice(0, 10);
+      const endClean = endStr.slice(0, 10);
+      const startDate = new Date(`${startClean}T00:00:00.000Z`);
+      const endDate = new Date(`${endClean}T23:59:59.999Z`);
       if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime()) || endDate < startDate) {
         return NextResponse.json({ error: 'Choose a valid date range.' }, { status: 400 });
       }
       whereClause.date = {
-        gte: startOfDay(startDate),
-        lte: endOfDay(endDate),
+        gte: startDate,
+        lte: endDate,
       };
     }
 
@@ -89,14 +103,21 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Invalid attendance status' }, { status: 400 });
     }
 
-    const parsedDate = new Date(date);
-    if (Number.isNaN(parsedDate.getTime())) return NextResponse.json({ error: 'Choose a valid date.' }, { status: 400 });
-    const targetDate = startOfDay(parsedDate);
-    const targetEnd = endOfDay(new Date(date));
+    const cleanDate = typeof date === 'string' ? date.slice(0, 10) : new Date(date).toISOString().slice(0, 10);
+    const targetDate = new Date(`${cleanDate}T00:00:00.000Z`);
+    const targetEnd = new Date(`${cleanDate}T23:59:59.999Z`);
+    if (Number.isNaN(targetDate.getTime())) return NextResponse.json({ error: 'Choose a valid date.' }, { status: 400 });
+
+    const activeSemester = await prisma.semester.findFirst({
+      where: { userId: user.id, isActive: true },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (!activeSemester) return NextResponse.json({ error: 'No active semester found.' }, { status: 400 });
 
     await prisma.lectureInstance.updateMany({
       where: {
         userId: user.id,
+        subject: { semesterId: activeSemester.id },
         date: {
           gte: targetDate,
           lte: targetEnd,

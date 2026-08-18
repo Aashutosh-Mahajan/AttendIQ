@@ -1,8 +1,9 @@
 'use client';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
-import { Eye, EyeOff, Mail } from 'lucide-react';
+import { Eye, EyeOff, Mail, ArrowRight, ShieldCheck, CheckCircle2, AlertCircle } from 'lucide-react';
 import { createSupabaseBrowserClient } from '@/lib/auth/client';
 
 export default function AuthForm({
@@ -44,6 +45,17 @@ export default function AuthForm({
     return () => clearTimeout(t);
   }, [resendCooldown]);
 
+  const getDestination = () => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const next = params.get('next');
+      if (next && next.startsWith('/') && !next.startsWith('//')) {
+        return next;
+      }
+    }
+    return '/dashboard';
+  };
+
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     setLoading(true);
@@ -51,7 +63,6 @@ export default function AuthForm({
     setInfo('');
 
     try {
-
       // ── SIGN UP — STEP 1: create account & send OTP ────────────────────────
       if (mode === 'signup' && signupStep === 'form') {
         const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({
@@ -65,14 +76,10 @@ export default function AuthForm({
           return;
         }
 
-        // If Supabase auto-confirmed (dashboard "Confirm email" OFF), sign out
-        // so the user must still verify via OTP
         if (signUpData?.session) {
           await supabase.auth.signOut();
         }
 
-        // signUp already sends the OTP — move to step 2 immediately.
-        // We do NOT call signInWithOtp here to avoid rate-limit errors.
         setSignupStep('otp');
         setResendCooldown(60);
         return;
@@ -103,8 +110,7 @@ export default function AuthForm({
           return;
         }
 
-        router.push('/');
-        router.refresh();
+        window.location.assign(getDestination());
         return;
       }
 
@@ -134,8 +140,7 @@ export default function AuthForm({
         }
 
         sessionStorage.removeItem('attendiq_verify_email');
-        router.push('/');
-        router.refresh();
+        window.location.assign(getDestination());
         return;
       }
 
@@ -151,7 +156,6 @@ export default function AuthForm({
             signInErr.message?.toLowerCase().includes('email not confirmed') ||
             signInErr.message?.toLowerCase().includes('not confirmed')
           ) {
-            // Resend OTP and go to verify-email page
             await supabase.auth.signInWithOtp({
               email: email.trim().toLowerCase(),
               options: { shouldCreateUser: false },
@@ -164,16 +168,12 @@ export default function AuthForm({
           return;
         }
 
-        router.push('/');
-        router.refresh();
+        window.location.assign(getDestination());
         return;
       }
 
       // ── FORGOT PASSWORD ────────────────────────────────────────────────────
       if (mode === 'forgot') {
-        // resetPasswordForEmail triggers the dedicated "Reset Password" email
-        // template in Supabase (Authentication → Email Templates → Reset Password).
-        // With OTP enabled, Supabase sends a 6-digit token instead of a link.
         const { error: resetErr } = await supabase.auth.resetPasswordForEmail(
           email.trim().toLowerCase(),
           { redirectTo: `${window.location.origin}/reset-password` }
@@ -191,7 +191,6 @@ export default function AuthForm({
 
       // ── RESET PASSWORD ─────────────────────────────────────────────────────
       if (mode === 'reset') {
-        // type: 'recovery' matches the token sent by resetPasswordForEmail
         const { error: verifyErr } = await supabase.auth.verifyOtp({
           email: email.trim().toLowerCase(),
           token: otp,
@@ -210,7 +209,7 @@ export default function AuthForm({
         }
 
         sessionStorage.removeItem('attendiq_reset_email');
-        router.push('/login');
+        window.location.assign('/dashboard');
         return;
       }
 
@@ -227,14 +226,12 @@ export default function AuthForm({
     let err: { message: string } | null = null;
 
     if (mode === 'reset') {
-      // Resend the dedicated password-reset email
       const { error } = await supabase.auth.resetPasswordForEmail(
         email.trim().toLowerCase(),
         { redirectTo: `${window.location.origin}/reset-password` }
       );
       err = error;
     } else {
-      // Resend signup / verify OTP
       const { error } = await supabase.auth.signInWithOtp({
         email: email.trim().toLowerCase(),
         options: { shouldCreateUser: false },
@@ -245,7 +242,7 @@ export default function AuthForm({
     if (err) {
       setError(err.message || 'Failed to resend code.');
     } else {
-      setInfo('A new code has been sent to your email.');
+      setInfo('A new verification code has been dispatched.');
       setResendCooldown(60);
     }
   };
@@ -258,36 +255,36 @@ export default function AuthForm({
 
   // ── Titles & subtitles ─────────────────────────────────────────────────────
   const getTitle = () => {
-    if (mode === 'signup' && signupStep === 'otp') return 'Verify your email';
-    if (mode === 'signup') return 'Create your account';
-    if (mode === 'verify') return 'Verify your email';
-    if (mode === 'forgot') return 'Reset your password';
-    if (mode === 'reset') return 'Set new password';
-    return 'Welcome back';
+    if (mode === 'signup' && signupStep === 'otp') return 'Verify Identity';
+    if (mode === 'signup') return 'Open Your Ledger';
+    if (mode === 'verify') return 'Verify Email Address';
+    if (mode === 'forgot') return 'Account Recovery';
+    if (mode === 'reset') return 'Set New Password';
+    return 'Welcome Back';
   };
 
   const getSubtitle = () => {
     if (mode === 'signup' && signupStep === 'otp')
-      return `We sent a 6-digit code to ${maskedEmail}. Enter it below to activate your account.`;
-    if (mode === 'signup') return 'Use your email to get started.';
+      return `Enter the 6-digit code sent to ${maskedEmail}.`;
+    if (mode === 'signup') return 'Start tracking your college attendance with clarity.';
     if (mode === 'verify')
       return email
-        ? `Enter the 6-digit code sent to ${maskedEmail}.`
-        : 'Enter your email and the 6-digit code we sent you.';
-    if (mode === 'forgot') return "Enter your email and we'll send a 6-digit reset code.";
+        ? `Enter the 6-digit verification code sent to ${maskedEmail}.`
+        : 'Enter your email and the 6-digit verification code.';
+    if (mode === 'forgot') return "Enter your registered email to receive a recovery code.";
     if (mode === 'reset')
-      return `Enter the code sent to ${maskedEmail || 'your email'} and choose a new password.`;
-    return 'Sign in to your timetable and attendance.';
+      return `Enter the code sent to ${maskedEmail || 'your email'} and set a new password.`;
+    return 'Sign in to access your active timetable and ledger.';
   };
 
   const getButtonText = () => {
-    if (loading) return 'Please wait…';
-    if (mode === 'signup' && signupStep === 'otp') return 'Verify & sign in';
-    if (mode === 'signup') return 'Create account';
-    if (mode === 'verify') return 'Verify email';
-    if (mode === 'forgot') return 'Send reset code';
-    if (mode === 'reset') return 'Reset password';
-    return 'Sign in';
+    if (loading) return 'Verifying…';
+    if (mode === 'signup' && signupStep === 'otp') return 'Verify & Open Ledger';
+    if (mode === 'signup') return 'Continue';
+    if (mode === 'verify') return 'Verify Email';
+    if (mode === 'forgot') return 'Send Recovery Code';
+    if (mode === 'reset') return 'Update Password';
+    return 'Sign In';
   };
 
   const showOtpInput =
@@ -299,8 +296,8 @@ export default function AuthForm({
 
   if (!hydrated) {
     return (
-      <main className="min-h-screen flex items-center justify-center bg-[#0b0f17]">
-        <div className="h-8 w-8 rounded-full border-2 border-indigo-500 border-t-transparent animate-spin" />
+      <main className="min-h-screen flex items-center justify-center bg-paper-950">
+        <div className="h-6 w-6 rounded-full border-2 border-white/20 border-t-white animate-spin" />
       </main>
     );
   }
@@ -308,78 +305,100 @@ export default function AuthForm({
   return (
     <main
       suppressHydrationWarning
-      className="min-h-screen flex items-center justify-center p-5 bg-[#0b0f17]"
+      className="min-h-screen flex items-center justify-center p-4 sm:p-6 bg-paper-950 ledger-grid-bg"
     >
-      <div className="w-full max-w-md glass-card rounded-2xl p-7 border border-white/10">
+      <div className="w-full max-w-md paper-card rounded-2xl p-7 sm:p-8 border border-white/10 shadow-paper-lg animate-in">
 
-        {/* Brand */}
-        <div className="flex items-center gap-3 mb-7">
-          <img src="/logo.jpg" alt="AttendIQ Logo" className="h-10 w-10 rounded-xl object-cover bg-white" />
+        {/* Brand Header */}
+        <div className="flex items-center gap-3 mb-6">
+          <Image src="/logo.jpg" alt="AttendIQ Logo" width={36} height={36} className="h-9 w-9 rounded-xl object-cover bg-white ring-1 ring-white/15" />
           <div>
-            <h1 className="font-bold text-xl text-white">
-              Attend<span className="text-cyan-300">IQ</span>
+            <h1 className="font-bold text-lg text-white tracking-tight">
+              Attend<span className="text-stone-300 font-serif italic text-xl">IQ</span>
             </h1>
-            <p className="text-xs text-gray-400">Track Today, Stay Ahead</p>
+            <p className="text-[10px] font-mono tracking-wider uppercase text-paper-400">Academic Ledger</p>
           </div>
         </div>
 
-        <h2 className="text-xl font-bold text-white">{getTitle()}</h2>
-        <p className="text-sm text-gray-400 mt-1 mb-5">{getSubtitle()}</p>
+        <div className="space-y-1 mb-6">
+          <h2 className="text-xl font-bold text-white tracking-tight">{getTitle()}</h2>
+          <p className="text-xs text-paper-400 font-light leading-relaxed">{getSubtitle()}</p>
+        </div>
 
-        {/* OTP step indicator for signup */}
+        {/* Progress indicator for signup */}
         {mode === 'signup' && (
-          <div className="flex items-center gap-2 mb-5">
-            <div className={`h-1.5 flex-1 rounded-full transition-colors ${signupStep === 'form' ? 'bg-indigo-500' : 'bg-indigo-500'}`} />
-            <div className={`h-1.5 flex-1 rounded-full transition-colors ${signupStep === 'otp' ? 'bg-indigo-500' : 'bg-white/10'}`} />
-            <span className="text-xs text-gray-500 ml-1">
-              {signupStep === 'form' ? 'Step 1 of 2' : 'Step 2 of 2'}
+          <div className="flex items-center gap-2 mb-6">
+            <div className={`h-1 flex-1 rounded-full transition-colors ${signupStep === 'form' ? 'bg-white' : 'bg-white/40'}`} />
+            <div className={`h-1 flex-1 rounded-full transition-colors ${signupStep === 'otp' ? 'bg-white' : 'bg-white/10'}`} />
+            <span className="text-[10px] font-mono text-paper-400 ml-1 uppercase">
+              {signupStep === 'form' ? 'Step 1/2' : 'Step 2/2'}
             </span>
           </div>
         )}
 
         {error && (
-          <p className="mb-4 p-3 rounded-xl bg-rose-500/20 text-rose-300 text-xs">{error}</p>
+          <div className="mb-4 p-3 rounded-xl bg-orange-500/10 border border-orange-500/25 text-orange-200 text-xs flex items-center gap-2">
+            <AlertCircle className="h-4 w-4 shrink-0 text-orange-400" />
+            <span>{error}</span>
+          </div>
         )}
         {info && (
-          <p className="mb-4 p-3 rounded-xl bg-emerald-500/20 text-emerald-300 text-xs">{info}</p>
+          <div className="mb-4 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-emerald-200 text-xs flex items-center gap-2">
+            <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-400" />
+            <span>{info}</span>
+          </div>
         )}
 
-        <form suppressHydrationWarning onSubmit={submit} className="space-y-4 text-sm">
+        <form suppressHydrationWarning onSubmit={submit} className="space-y-3.5 text-xs">
 
           {/* ── SIGNUP STEP 1: name + email + password ── */}
           {mode === 'signup' && signupStep === 'form' && (
             <>
-              <input
-                suppressHydrationWarning
-                required
-                placeholder="Your name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="w-full p-3 rounded-xl bg-[#0b0f17] border border-white/10 text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500"
-              />
-              <input
-                suppressHydrationWarning
-                required
-                type="email"
-                placeholder="Email address"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full p-3 rounded-xl bg-[#0b0f17] border border-white/10 text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500"
-              />
-              <div className="relative">
+              <div>
+                <label className="block text-[11px] font-mono text-paper-400 uppercase tracking-wider mb-1">Full Name</label>
                 <input
                   suppressHydrationWarning
                   required
-                  type={showPassword ? 'text' : 'password'}
-                  minLength={8}
-                  placeholder="Password (8+ characters)"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full p-3 pr-10 rounded-xl bg-[#0b0f17] border border-white/10 text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500"
+                  placeholder="e.g. Alex Morgan"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="w-full p-3 rounded-xl bg-white/[0.03] border border-white/10 text-white placeholder-paper-400 focus:outline-none focus:border-white/30 text-xs"
                 />
-                <button suppressHydrationWarning type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-3.5 text-gray-400 hover:text-white">
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
+              </div>
+              <div>
+                <label className="block text-[11px] font-mono text-paper-400 uppercase tracking-wider mb-1">Email Address</label>
+                <input
+                  suppressHydrationWarning
+                  required
+                  type="email"
+                  placeholder="student@university.edu"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full p-3 rounded-xl bg-white/[0.03] border border-white/10 text-white placeholder-paper-400 focus:outline-none focus:border-white/30 text-xs"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] font-mono text-paper-400 uppercase tracking-wider mb-1">Password</label>
+                <div className="relative">
+                  <input
+                    suppressHydrationWarning
+                    required
+                    type={showPassword ? 'text' : 'password'}
+                    minLength={8}
+                    placeholder="8+ characters"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full p-3 pr-10 rounded-xl bg-white/[0.03] border border-white/10 text-white placeholder-paper-400 focus:outline-none focus:border-white/30 text-xs"
+                  />
+                  <button
+                    suppressHydrationWarning
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-3 text-paper-400 hover:text-white"
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
               </div>
             </>
           )}
@@ -387,25 +406,23 @@ export default function AuthForm({
           {/* ── SIGNUP STEP 2: OTP only ── */}
           {mode === 'signup' && signupStep === 'otp' && (
             <div className="space-y-3">
-              {/* Email badge */}
-              <div className="flex items-center gap-2 p-3 rounded-xl bg-white/[0.04] border border-white/10">
-                <Mail className="h-4 w-4 text-indigo-400 shrink-0" />
-                <span className="text-sm text-gray-300 truncate">{email}</span>
+              <div className="flex items-center gap-2 p-3 rounded-xl bg-white/[0.03] border border-white/10">
+                <Mail className="h-4 w-4 text-stone-300 shrink-0" />
+                <span className="text-xs text-stone-200 truncate">{email}</span>
               </div>
-              {/* OTP input */}
               <input
                 suppressHydrationWarning
                 required
                 inputMode="numeric"
                 maxLength={6}
-                placeholder="_ _ _ _ _ _"
+                placeholder="· · · · · ·"
                 value={otp}
                 onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
                 autoFocus
-                className="w-full p-4 rounded-xl bg-[#0b0f17] border border-indigo-500/40 text-white placeholder-gray-700 tracking-[0.6em] text-center text-2xl font-bold focus:outline-none focus:border-indigo-500"
+                className="w-full p-3.5 rounded-xl bg-white/[0.03] border border-white/20 text-white placeholder-paper-400 tracking-[0.5em] text-center text-xl font-mono font-bold focus:outline-none focus:border-white"
               />
-              <p className="text-xs text-gray-500 text-center">
-                Check your inbox (and spam folder) for the 6-digit code.
+              <p className="text-[11px] text-paper-400 text-center font-light">
+                Enter the 6-digit code received in your inbox.
               </p>
             </div>
           )}
@@ -413,34 +430,45 @@ export default function AuthForm({
           {/* ── LOGIN ── */}
           {mode === 'login' && (
             <>
-              <input
-                suppressHydrationWarning
-                required
-                type="email"
-                placeholder="Email address"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full p-3 rounded-xl bg-[#0b0f17] border border-white/10 text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500"
-              />
-              <div className="relative">
+              <div>
+                <label className="block text-[11px] font-mono text-paper-400 uppercase tracking-wider mb-1">Email</label>
                 <input
                   suppressHydrationWarning
                   required
-                  type={showPassword ? 'text' : 'password'}
-                  minLength={8}
-                  placeholder="Password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full p-3 pr-10 rounded-xl bg-[#0b0f17] border border-white/10 text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500"
+                  type="email"
+                  placeholder="student@university.edu"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full p-3 rounded-xl bg-white/[0.03] border border-white/10 text-white placeholder-paper-400 focus:outline-none focus:border-white/30 text-xs"
                 />
-                <button suppressHydrationWarning type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-3.5 text-gray-400 hover:text-white">
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
               </div>
-              <div className="flex justify-end">
-                <Link href="/forgot-password" className="text-xs text-indigo-400 hover:text-indigo-300">
-                  Forgot your password?
-                </Link>
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-[11px] font-mono text-paper-400 uppercase tracking-wider">Password</label>
+                  <Link href="/forgot-password" className="text-[10px] font-mono text-paper-400 hover:text-white transition-colors">
+                    Forgot password?
+                  </Link>
+                </div>
+                <div className="relative">
+                  <input
+                    suppressHydrationWarning
+                    required
+                    type={showPassword ? 'text' : 'password'}
+                    minLength={8}
+                    placeholder="Enter password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full p-3 pr-10 rounded-xl bg-white/[0.03] border border-white/10 text-white placeholder-paper-400 focus:outline-none focus:border-white/30 text-xs"
+                  />
+                  <button
+                    suppressHydrationWarning
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-3 text-paper-400 hover:text-white"
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
               </div>
             </>
           )}
@@ -453,16 +481,16 @@ export default function AuthForm({
                   suppressHydrationWarning
                   required
                   type="email"
-                  placeholder="Your email address"
+                  placeholder="Enter your email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full p-3 rounded-xl bg-[#0b0f17] border border-white/10 text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500"
+                  className="w-full p-3 rounded-xl bg-white/[0.03] border border-white/10 text-white placeholder-paper-400 focus:outline-none focus:border-white/30 text-xs"
                 />
               )}
               {email && (
-                <div className="flex items-center gap-2 p-3 rounded-xl bg-white/[0.04] border border-white/10">
-                  <Mail className="h-4 w-4 text-indigo-400 shrink-0" />
-                  <span className="text-sm text-gray-300 truncate">{email}</span>
+                <div className="flex items-center gap-2 p-3 rounded-xl bg-white/[0.03] border border-white/10">
+                  <Mail className="h-4 w-4 text-stone-300 shrink-0" />
+                  <span className="text-xs text-stone-200 truncate">{email}</span>
                 </div>
               )}
               <input
@@ -470,35 +498,38 @@ export default function AuthForm({
                 required
                 inputMode="numeric"
                 maxLength={6}
-                placeholder="_ _ _ _ _ _"
+                placeholder="· · · · · ·"
                 value={otp}
                 onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
                 autoFocus
-                className="w-full p-4 rounded-xl bg-[#0b0f17] border border-indigo-500/40 text-white placeholder-gray-700 tracking-[0.6em] text-center text-2xl font-bold focus:outline-none focus:border-indigo-500"
+                className="w-full p-3.5 rounded-xl bg-white/[0.03] border border-white/20 text-white placeholder-paper-400 tracking-[0.5em] text-center text-xl font-mono font-bold focus:outline-none focus:border-white"
               />
             </>
           )}
 
           {/* ── FORGOT PASSWORD ── */}
           {mode === 'forgot' && (
-            <input
-              suppressHydrationWarning
-              required
-              type="email"
-              placeholder="Email address"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full p-3 rounded-xl bg-[#0b0f17] border border-white/10 text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500"
-            />
+            <div>
+              <label className="block text-[11px] font-mono text-paper-400 uppercase tracking-wider mb-1">Email Address</label>
+              <input
+                suppressHydrationWarning
+                required
+                type="email"
+                placeholder="student@university.edu"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full p-3 rounded-xl bg-white/[0.03] border border-white/10 text-white placeholder-paper-400 focus:outline-none focus:border-white/30 text-xs"
+              />
+            </div>
           )}
 
           {/* ── RESET PASSWORD ── */}
           {mode === 'reset' && (
             <>
               {email && (
-                <div className="flex items-center gap-2 p-3 rounded-xl bg-white/[0.04] border border-white/10">
-                  <Mail className="h-4 w-4 text-indigo-400 shrink-0" />
-                  <span className="text-sm text-gray-300 truncate">{email}</span>
+                <div className="flex items-center gap-2 p-3 rounded-xl bg-white/[0.03] border border-white/10">
+                  <Mail className="h-4 w-4 text-stone-300 shrink-0" />
+                  <span className="text-xs text-stone-200 truncate">{email}</span>
                 </div>
               )}
               <input
@@ -506,11 +537,11 @@ export default function AuthForm({
                 required
                 inputMode="numeric"
                 maxLength={6}
-                placeholder="_ _ _ _ _ _"
+                placeholder="· · · · · ·"
                 value={otp}
                 onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
                 autoFocus
-                className="w-full p-4 rounded-xl bg-[#0b0f17] border border-indigo-500/40 text-white placeholder-gray-700 tracking-[0.6em] text-center text-2xl font-bold focus:outline-none focus:border-indigo-500"
+                className="w-full p-3.5 rounded-xl bg-white/[0.03] border border-white/20 text-white placeholder-paper-400 tracking-[0.5em] text-center text-xl font-mono font-bold focus:outline-none focus:border-white"
               />
               <div className="relative">
                 <input
@@ -521,33 +552,40 @@ export default function AuthForm({
                   placeholder="New password (8+ characters)"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full p-3 pr-10 rounded-xl bg-[#0b0f17] border border-white/10 text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500"
+                  className="w-full p-3 pr-10 rounded-xl bg-white/[0.03] border border-white/10 text-white placeholder-paper-400 focus:outline-none focus:border-white/30 text-xs"
                 />
-                <button suppressHydrationWarning type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-3.5 text-gray-400 hover:text-white">
+                <button
+                  suppressHydrationWarning
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-3 text-paper-400 hover:text-white"
+                >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
             </>
           )}
 
-          <button
-            suppressHydrationWarning
-            disabled={loading}
-            className="w-full p-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-60 text-white font-semibold transition-colors"
-          >
-            {getButtonText()}
-          </button>
+          <div className="pt-2">
+            <button
+              suppressHydrationWarning
+              disabled={loading}
+              className="w-full py-3 px-4 rounded-xl bg-white hover:bg-stone-200 disabled:opacity-60 text-paper-950 font-bold text-xs uppercase tracking-wider transition-all shadow-paper-sm hover:-translate-y-0.5 active:translate-y-0"
+            >
+              {getButtonText()}
+            </button>
+          </div>
         </form>
 
         {/* Resend OTP */}
         {showResend && (
-          <p className="text-center text-xs text-gray-400 mt-4">
-            Didn&apos;t receive a code?{' '}
+          <p className="text-center text-[11px] text-paper-400 mt-4 font-light">
+            Didn&apos;t receive the code?{' '}
             <button
               type="button"
               onClick={resendOtp}
               disabled={resendCooldown > 0 || !email}
-              className="text-indigo-400 hover:text-indigo-300 disabled:opacity-40 underline-offset-2 hover:underline"
+              className="text-white hover:underline underline-offset-4 disabled:opacity-40 font-medium"
             >
               {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend code'}
             </button>
@@ -556,12 +594,12 @@ export default function AuthForm({
 
         {/* Back link on signup OTP step */}
         {mode === 'signup' && signupStep === 'otp' && (
-          <p className="text-center text-xs text-gray-400 mt-3">
+          <p className="text-center text-[11px] text-paper-400 mt-2">
             Wrong email?{' '}
             <button
               type="button"
               onClick={() => { setSignupStep('form'); setOtp(''); setError(''); }}
-              className="text-indigo-400 hover:text-indigo-300 underline-offset-2 hover:underline"
+              className="text-white hover:underline underline-offset-4"
             >
               Go back
             </button>
@@ -570,19 +608,19 @@ export default function AuthForm({
 
         {/* Footer links */}
         {mode !== 'verify' && mode !== 'reset' && mode !== 'forgot' && signupStep !== 'otp' && (
-          <p className="text-center text-xs text-gray-400 mt-5">
+          <p className="text-center text-[11px] text-paper-400 mt-5 font-light">
             {mode === 'login' ? (
-              <>New here? <Link className="text-cyan-300" href="/signup">Create an account</Link></>
+              <>New to AttendIQ? <Link className="text-white hover:underline underline-offset-4 font-medium" href="/signup">Create account</Link></>
             ) : (
-              <>Already have an account? <Link className="text-cyan-300" href="/login">Sign in</Link></>
+              <>Already registered? <Link className="text-white hover:underline underline-offset-4 font-medium" href="/login">Sign in</Link></>
             )}
           </p>
         )}
 
         {mode === 'forgot' && (
-          <p className="text-center text-xs text-gray-400 mt-5">
-            Remember your password?{' '}
-            <Link className="text-cyan-300" href="/login">Sign in</Link>
+          <p className="text-center text-[11px] text-paper-400 mt-5">
+            Remembered your password?{' '}
+            <Link className="text-white hover:underline underline-offset-4 font-medium" href="/login">Sign in</Link>
           </p>
         )}
 

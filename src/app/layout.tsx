@@ -1,10 +1,30 @@
 import type { Metadata } from 'next';
+import { Plus_Jakarta_Sans, Instrument_Serif, JetBrains_Mono } from 'next/font/google';
 import './globals.css';
 import AppShell from '@/components/layout/AppShell';
 
+const sansFont = Plus_Jakarta_Sans({
+  subsets: ['latin'],
+  variable: '--font-sans',
+  display: 'swap',
+});
+
+const serifFont = Instrument_Serif({
+  weight: '400',
+  subsets: ['latin'],
+  variable: '--font-serif',
+  display: 'swap',
+});
+
+const monoFont = JetBrains_Mono({
+  subsets: ['latin'],
+  variable: '--font-mono',
+  display: 'swap',
+});
+
 export const metadata: Metadata = {
-  title: 'AttendIQ — Smart College Attendance Tracker',
-  description: 'Track college attendance, auto-generate weekly lecture schedules, and calculate safe skips vs required classes.',
+  title: 'AttendIQ — Minimalist Attendance & Ledger Tracker',
+  description: 'Smart college attendance tracker, automated weekly schedule ledger, and safe skip bunk calculator.',
 };
 
 export default function RootLayout({
@@ -13,16 +33,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark">
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
-          rel="stylesheet"
-        />
-      </head>
-      <body className="bg-[#0b0f17] text-gray-100 antialiased min-h-screen" style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
+    <html lang="en" className={`dark ${sansFont.variable} ${serifFont.variable} ${monoFont.variable}`}>
+      <body className="bg-paper-950 text-paper-100 antialiased min-h-screen font-sans selection:bg-paper-200/20 selection:text-paper-50">
         <AppShell>{children}</AppShell>
       </body>
     </html>

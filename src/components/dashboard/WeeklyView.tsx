@@ -7,7 +7,6 @@ import {
   subWeeks,
   startOfWeek,
   addDays,
-  subDays,
   isSameDay,
   isToday,
   isSameMonth,
@@ -28,6 +27,7 @@ import {
   CheckCircle2,
   XCircle,
   X,
+  Flame,
 } from 'lucide-react';
 import LectureCard, { Lecture } from './LectureCard';
 import LiveClock from './LiveClock';
@@ -58,7 +58,7 @@ function MiniCalendar({
   const daysInMonth = eachDayOfInterval({ start: monthStart, end: monthEnd });
 
   // pad start of month grid (Monday = 0)
-  const startPad = (getDay(monthStart) + 6) % 7; // 0=Mon, 6=Sun
+  const startPad = (getDay(monthStart) + 6) % 7;
   const paddedDays: (Date | null)[] = [
     ...Array.from({ length: startPad }, () => null),
     ...daysInMonth,
@@ -67,20 +67,24 @@ function MiniCalendar({
   return (
     <div
       ref={calRef}
-      className="absolute left-0 top-full mt-2 z-50 w-72 rounded-2xl bg-[#111827] border border-white/10 shadow-2xl shadow-black/70 p-4"
+      className="absolute left-0 top-full mt-2 z-50 w-72 rounded-2xl paper-card border border-white/15 shadow-paper-lg p-4 animate-in"
     >
       {/* Month header */}
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex items-center justify-between mb-3 border-b border-white/[0.08] pb-2">
         <button
           onClick={() => setViewMonth((m) => new Date(m.getFullYear(), m.getMonth() - 1, 1))}
-          className="p-1.5 rounded-lg hover:bg-white/10 text-gray-400 transition"
+          className="p-1 rounded-lg hover:bg-white/10 text-paper-400 hover:text-white transition"
+          aria-label="Previous month"
         >
           <ChevronLeft className="h-4 w-4" />
         </button>
-        <span className="text-sm font-semibold text-white">{format(viewMonth, 'MMMM yyyy')}</span>
+        <span className="text-xs font-mono font-bold text-white uppercase tracking-wider">
+          {format(viewMonth, 'MMMM yyyy')}
+        </span>
         <button
           onClick={() => setViewMonth((m) => new Date(m.getFullYear(), m.getMonth() + 1, 1))}
-          className="p-1.5 rounded-lg hover:bg-white/10 text-gray-400 transition"
+          className="p-1 rounded-lg hover:bg-white/10 text-paper-400 hover:text-white transition"
+          aria-label="Next month"
         >
           <ChevronRight className="h-4 w-4" />
         </button>
@@ -89,7 +93,7 @@ function MiniCalendar({
       {/* Day names */}
       <div className="grid grid-cols-7 gap-0.5 mb-1">
         {['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'].map((d) => (
-          <div key={d} className="text-center text-[10px] font-semibold text-gray-500 py-1">
+          <div key={d} className="text-center font-mono text-[9px] font-semibold text-paper-400 py-0.5 uppercase">
             {d}
           </div>
         ))}
@@ -111,14 +115,14 @@ function MiniCalendar({
                 onSelectDate(day);
                 onClose();
               }}
-              className={`h-8 w-full rounded-lg text-xs font-medium transition-all ${
+              className={`h-7 w-full rounded-lg text-xs font-mono transition-all ${
                 isSelected
-                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
+                  ? 'bg-white text-paper-950 font-bold shadow-paper-sm'
                   : isTodayDate
-                  ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
+                  ? 'bg-white/10 text-white font-semibold border border-white/20'
                   : isCurrentMonth
-                  ? 'text-gray-300 hover:bg-white/10'
-                  : 'text-gray-600'
+                  ? 'text-paper-200 hover:bg-white/10'
+                  : 'text-paper-500'
               }`}
             >
               {format(day, 'd')}
@@ -128,13 +132,13 @@ function MiniCalendar({
       </div>
 
       {/* Quick jump */}
-      <div className="mt-3 pt-3 border-t border-white/5 flex gap-2">
+      <div className="mt-3 pt-2.5 border-t border-white/[0.08] flex gap-2">
         <button
           onClick={() => {
             onSelectDate(new Date());
             onClose();
           }}
-          className="flex-1 text-xs text-center py-1.5 rounded-lg bg-indigo-600/80 text-white font-medium hover:bg-indigo-600 transition"
+          className="flex-1 text-[11px] font-mono uppercase tracking-wider text-center py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white font-semibold transition"
         >
           Jump to Today
         </button>
@@ -158,7 +162,7 @@ export default function WeeklyView() {
 
   const weekDays = [0, 1, 2, 3, 4, 5].map((offset) => addDays(currentWeekStart, offset));
 
-  const fetchLectures = async () => {
+  const fetchLectures = React.useCallback(async () => {
     try {
       setLoading(true);
       const startDate = format(currentWeekStart, 'yyyy-MM-dd');
@@ -172,9 +176,9 @@ export default function WeeklyView() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentWeekStart]);
 
-  const fetchOverallHealth = async () => {
+  const fetchOverallHealth = React.useCallback(async () => {
     try {
       const res = await fetch('/api/subjects');
       const data = await res.json();
@@ -198,12 +202,12 @@ export default function WeeklyView() {
         setOverallHealth({ percentage: 100, bunkable: 0, mustAttend: 0 });
       }
     } catch {}
-  };
+  }, []);
 
   useEffect(() => {
     fetchLectures();
     fetchOverallHealth();
-  }, [currentWeekStart]);
+  }, [fetchLectures, fetchOverallHealth]);
 
   const handleStatusChange = async (id: string, nextStatus: Lecture['status']) => {
     setLectures((prev) =>
@@ -247,27 +251,27 @@ export default function WeeklyView() {
   };
 
   return (
-    <div className="space-y-6">
-      {/* ── Header ── */}
-      <div className="glass-card p-5 rounded-2xl">
+    <div className="space-y-5">
+      {/* ── Toolbar ── */}
+      <div className="paper-card p-4 sm:p-5 rounded-2xl border border-white/10 shadow-paper-sm">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          {/* Left: title + calendar picker */}
-          <div className="flex items-center gap-4">
-            <div className="h-11 w-11 rounded-xl bg-gradient-to-br from-indigo-600/80 to-cyan-500/60 flex items-center justify-center text-white shadow-lg shadow-indigo-600/20">
-              <CalendarIcon className="h-5 w-5" />
+          {/* Left: date range picker */}
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-xl bg-white/[0.05] border border-white/10 flex items-center justify-center text-white shrink-0">
+              <CalendarIcon className="h-4 w-4" />
             </div>
             <div className="relative">
-              <h2 className="text-lg font-bold text-white">Weekly Dashboard</h2>
+              <p className="text-[10px] font-mono uppercase tracking-widest text-paper-400 leading-none">Schedule Window</p>
               <button
                 onClick={() => setCalendarOpen(!calendarOpen)}
-                className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-indigo-300 transition-colors mt-0.5 group"
+                className="flex items-center gap-1.5 text-xs sm:text-sm font-bold text-white hover:text-stone-300 transition-colors mt-1 group"
               >
-                <CalendarDays className="h-3.5 w-3.5 group-hover:text-indigo-400 transition-colors" />
+                <CalendarDays className="h-3.5 w-3.5 text-paper-400 group-hover:text-white" />
                 <span>
                   {format(currentWeekStart, 'MMM d')} – {format(addDays(currentWeekStart, 5), 'MMM d, yyyy')}
                 </span>
-                <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-gray-500 group-hover:text-indigo-300 group-hover:border-indigo-500/30 transition">
-                  Pick date
+                <span className="text-[9px] font-mono uppercase px-1.5 py-0.2 rounded bg-white/5 border border-white/10 text-paper-400 group-hover:border-white/20">
+                  Pick
                 </span>
               </button>
 
@@ -281,62 +285,75 @@ export default function WeeklyView() {
             </div>
           </div>
 
-          {/* Center: health pill */}
-          <div className="flex items-center gap-2.5">
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-indigo-500/10 border border-indigo-500/20">
-              <Zap className="h-4 w-4 text-cyan-400" />
-              <span className="text-xs font-medium text-gray-300">Overall:</span>
-              <span className="text-sm font-bold text-white">{overallHealth.percentage}%</span>
+          {/* Center: Health & Margins */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/[0.03] border border-white/[0.08]">
+              <span className="text-[11px] font-mono text-paper-400 uppercase tracking-wider">Overall:</span>
+              <span className="text-xs font-mono font-bold text-white tabular-nums">{overallHealth.percentage}%</span>
             </div>
 
             {overallHealth.mustAttend > 0 ? (
-              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-500/15 text-rose-300 border border-rose-500/30 text-xs font-semibold">
-                <AlertTriangle className="h-3.5 w-3.5" />
+              <div className="ink-stamp ink-stamp-missed">
+                <AlertTriangle className="h-3 w-3" />
                 Must Attend: {overallHealth.mustAttend}
               </div>
             ) : (
-              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 text-xs font-semibold">
-                <Sparkles className="h-3.5 w-3.5" />
-                Bunkable: {overallHealth.bunkable}
+              <div className="ink-stamp ink-stamp-attended">
+                <Sparkles className="h-3 w-3" />
+                Safe Skips: {overallHealth.bunkable}
               </div>
             )}
           </div>
 
-          {/* Right: week nav */}
+          {/* Right: navigation controls */}
           <div className="flex items-center gap-2">
             <LiveClock />
-            <button
-              onClick={() => setCurrentWeekStart((w) => subWeeks(w, 1))}
-              className="p-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-gray-300 transition-all"
-              aria-label="Previous week"
-              title="Previous week"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </button>
-            <button
-              onClick={() => setCurrentWeekStart(startOfWeek(new Date(), { weekStartsOn: 1 }))}
-              className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 border border-indigo-400/30 text-white font-semibold text-xs shadow-md shadow-indigo-600/25 transition-all"
-            >
-              This week
-            </button>
-            <button
-              onClick={() => setCurrentWeekStart((w) => addWeeks(w, 1))}
-              className="p-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-gray-300 transition-all"
-              aria-label="Next week"
-              title="Next week"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setCurrentWeekStart((w) => subWeeks(w, 1))}
+                className="p-2 rounded-xl bg-white/[0.04] border border-white/10 hover:bg-white/[0.08] text-paper-300 hover:text-white transition-all"
+                aria-label="Previous week"
+                title="Previous week"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <button
+                onClick={() => setCurrentWeekStart(startOfWeek(new Date(), { weekStartsOn: 1 }))}
+                className="px-3 py-2 rounded-xl bg-white hover:bg-stone-200 text-paper-950 font-bold text-xs font-mono uppercase tracking-wider shadow-paper-sm transition-all"
+              >
+                This week
+              </button>
+              <button
+                onClick={() => setCurrentWeekStart((w) => addWeeks(w, 1))}
+                className="p-2 rounded-xl bg-white/[0.04] border border-white/10 hover:bg-white/[0.08] text-paper-300 hover:text-white transition-all"
+                aria-label="Next week"
+                title="Next week"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* ── Day Columns Grid ── */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+      {/* ── 6-Day Column Grid ── */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3.5">
         {weekDays.map((dayDate) => {
           const dayName = format(dayDate, 'EEEE');
           const isCurrentDay = isToday(dayDate);
-          const dayLectures = lectures.filter((lec) => isSameDay(new Date(lec.date), dayDate));
+          const targetDayStr = format(dayDate, 'yyyy-MM-dd');
+
+          const dayLectures = lectures
+            .filter((lec) => {
+              const dStr = typeof lec.date === 'string' ? lec.date.slice(0, 10) : format(new Date(lec.date), 'yyyy-MM-dd');
+              return dStr === targetDayStr || isSameDay(new Date(lec.date), dayDate);
+            })
+            .reduce<Lecture[]>((acc, lec) => {
+              const isDup = acc.some((item) => item.id === lec.id || (item.subjectId === lec.subjectId && item.startTime === lec.startTime));
+              if (!isDup) acc.push(lec);
+              return acc;
+            }, [])
+            .sort((a, b) => a.startTime.localeCompare(b.startTime));
 
           const attendedCount = dayLectures.filter((l) => l.status === 'ATTENDED').length;
           const totalCount = dayLectures.length;
@@ -344,59 +361,59 @@ export default function WeeklyView() {
           return (
             <div
               key={dayDate.toISOString()}
-              className={`rounded-2xl flex flex-col min-h-[420px] transition-all duration-300 ${
+              className={`rounded-2xl flex flex-col min-h-[420px] transition-all duration-150 paper-card border ${
                 isCurrentDay
-                  ? 'glass-card border-indigo-500/40 shadow-[0_0_30px_-8px_rgba(99,102,241,0.25)]'
-                  : 'glass-card'
+                  ? 'border-white/30 shadow-paper-md bg-white/[0.03]'
+                  : 'border-white/[0.08]'
               }`}
             >
               {/* Day Column Header */}
-              <div className="flex items-center justify-between p-3.5 pb-2.5 border-b border-white/8">
+              <div className="flex items-center justify-between p-3 border-b border-white/[0.08]">
                 <div>
                   <div className="flex items-center gap-1.5">
-                    <span className={`text-sm font-bold ${isCurrentDay ? 'text-cyan-400' : 'text-white'}`}>
+                    <span className={`text-xs font-mono font-bold uppercase tracking-wider ${isCurrentDay ? 'text-white font-black' : 'text-stone-300'}`}>
                       {dayName.slice(0, 3)}
                     </span>
                     {isCurrentDay && (
-                      <span className="h-1.5 w-1.5 rounded-full bg-cyan-400 animate-pulse" />
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
                     )}
                   </div>
-                  <span className="text-[11px] text-gray-500 font-medium">
+                  <span className="text-[10px] font-mono text-paper-400">
                     {format(dayDate, 'd MMM')}
                   </span>
                 </div>
 
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1">
                   {totalCount > 0 && (
-                    <span className="text-[10px] font-medium text-gray-500 px-1.5 py-0.5 rounded bg-white/5">
+                    <span className="text-[9px] font-mono text-paper-400 px-1 py-0.2 rounded bg-white/5 border border-white/5 mr-0.5">
                       {attendedCount}/{totalCount}
                     </span>
                   )}
                   {totalCount > 0 && (
-                    <div className="flex items-center gap-1" aria-label="Mark all lectures for this day">
+                    <div className="flex items-center gap-0.5">
                       <button
                         onClick={() => handleBulkStatusChange(dayDate, 'ATTENDED')}
-                        className="p-1.5 rounded-lg bg-white/5 hover:bg-emerald-500/20 text-gray-500 hover:text-emerald-300 transition-all"
-                        title="Mark all lectures attended"
-                        aria-label="Mark all lectures attended"
+                        className="p-1 rounded-md hover:bg-emerald-500/20 text-paper-400 hover:text-emerald-300 transition-colors"
+                        title="Mark all attended"
+                        aria-label="Mark all attended"
                       >
-                        <CheckCircle2 className="h-3.5 w-3.5" />
+                        <CheckCircle2 className="h-3 w-3" />
                       </button>
                       <button
                         onClick={() => handleBulkStatusChange(dayDate, 'MISSED')}
-                        className="p-1.5 rounded-lg bg-white/5 hover:bg-rose-500/20 text-gray-500 hover:text-rose-300 transition-all"
-                        title="Mark all lectures not attended"
-                        aria-label="Mark all lectures not attended"
+                        className="p-1 rounded-md hover:bg-orange-500/20 text-paper-400 hover:text-orange-300 transition-colors"
+                        title="Mark all missed"
+                        aria-label="Mark all missed"
                       >
-                        <XCircle className="h-3.5 w-3.5" />
+                        <XCircle className="h-3 w-3" />
                       </button>
                       <button
                         onClick={() => handleBulkStatusChange(dayDate, 'HOLIDAY')}
-                        className="p-1.5 rounded-lg bg-white/5 hover:bg-amber-500/20 text-gray-500 hover:text-amber-300 transition-all"
-                        title="Mark all lectures as holiday"
-                        aria-label="Mark all lectures as holiday"
+                        className="p-1 rounded-md hover:bg-amber-500/20 text-paper-400 hover:text-amber-300 transition-colors"
+                        title="Mark all as holiday"
+                        aria-label="Mark all as holiday"
                       >
-                        <Sun className="h-3.5 w-3.5" />
+                        <Sun className="h-3 w-3" />
                       </button>
                     </div>
                   )}
@@ -404,19 +421,19 @@ export default function WeeklyView() {
               </div>
 
               {/* Lectures Stack */}
-              <div className="flex-1 space-y-2 p-3 overflow-y-auto">
+              <div className="flex-1 space-y-2 p-2.5 overflow-y-auto">
                 {loading ? (
-                  <div className="space-y-2.5 pt-1">
+                  <div className="space-y-2 pt-1">
                     {[1, 2].map((n) => (
-                      <div key={n} className="h-[68px] rounded-xl bg-white/[0.03] animate-pulse" />
+                      <div key={n} className="h-16 rounded-xl bg-white/[0.02] border border-white/5 animate-pulse" />
                     ))}
                   </div>
                 ) : dayLectures.length === 0 ? (
                   <div className="h-full flex flex-col items-center justify-center text-center py-12">
-                    <div className="h-10 w-10 rounded-full bg-white/[0.03] flex items-center justify-center mb-2">
-                      <CalendarIcon className="h-4 w-4 text-gray-600" />
+                    <div className="h-8 w-8 rounded-full bg-white/[0.02] border border-white/5 flex items-center justify-center mb-1.5">
+                      <CalendarIcon className="h-3.5 w-3.5 text-paper-500" />
                     </div>
-                    <span className="text-[11px] text-gray-600">No classes</span>
+                    <span className="text-[10px] font-mono uppercase tracking-wider text-paper-500">No Classes</span>
                   </div>
                 ) : (
                   dayLectures.map((lec) => (
@@ -428,24 +445,67 @@ export default function WeeklyView() {
           );
         })}
       </div>
+
+      {/* ── Attendance Modal Dialog ── */}
       {selectedLecture && (
-        <div className="fixed inset-0 z-50 bg-[#0b0f17]/80 backdrop-blur-md flex items-center justify-center p-4" onMouseDown={() => setSelectedLecture(null)}>
-          <div className="glass-card rounded-2xl max-w-md w-full p-6 border border-white/10 space-y-5" onMouseDown={(event) => event.stopPropagation()}>
-            <div className="flex items-start justify-between gap-4 border-b border-white/10 pb-4">
-              <div><p className="text-xs text-cyan-400 font-semibold">Attendance</p><h3 className="text-lg font-bold text-white mt-1">{selectedLecture.subject.name}</h3><p className="text-xs text-gray-400 mt-1">{format(new Date(selectedLecture.date), 'EEEE, d MMM')} · {selectedLecture.startTime} – {selectedLecture.endTime}</p></div>
-              <button onClick={() => setSelectedLecture(null)} className="p-1 rounded-lg text-gray-400 hover:text-white"><X className="h-5 w-5" /></button>
+        <div
+          className="fixed inset-0 z-50 bg-paper-950/80 backdrop-blur-sm flex items-center justify-center p-4"
+          onMouseDown={() => setSelectedLecture(null)}
+        >
+          <div
+            className="paper-card rounded-2xl max-w-sm w-full p-6 border border-white/15 shadow-paper-lg space-y-5 animate-in"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-4 border-b border-white/[0.08] pb-4">
+              <div>
+                <p className="text-[10px] font-mono uppercase tracking-widest text-paper-400">Record Attendance</p>
+                <h3 className="text-base font-bold text-white mt-0.5">{selectedLecture.subject.name}</h3>
+                <p className="text-[11px] font-mono text-paper-400 mt-1">
+                  {format(new Date(selectedLecture.date), 'EEEE, d MMM')} · {selectedLecture.startTime} – {selectedLecture.endTime}
+                </p>
+              </div>
+              <button
+                onClick={() => setSelectedLecture(null)}
+                className="p-1 rounded-lg text-paper-400 hover:text-white"
+                aria-label="Close dialog"
+              >
+                <X className="h-4 w-4" />
+              </button>
             </div>
-            <p className="text-sm text-gray-300">How should this lecture be recorded?</p>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+
+            <p className="text-xs text-stone-300 font-light">Select attendance status for this lecture:</p>
+
+            <div className="grid grid-cols-3 gap-2">
               {([
-                ['ATTENDED', 'Attended', CheckCircle2, 'bg-emerald-600 hover:bg-emerald-500'],
-                ['MISSED', 'Missed', XCircle, 'bg-rose-600 hover:bg-rose-500'],
-                ['HOLIDAY', 'Holiday', Sun, 'bg-amber-600 hover:bg-amber-500'],
+                ['ATTENDED', 'Attended', CheckCircle2, 'bg-emerald-600 hover:bg-emerald-500 text-white'],
+                ['MISSED', 'Missed', XCircle, 'bg-orange-600 hover:bg-orange-500 text-white'],
+                ['HOLIDAY', 'Holiday', Sun, 'bg-amber-600 hover:bg-amber-500 text-white'],
               ] as const).map(([status, label, Icon, className]) => (
-                <button key={status} onClick={() => { handleStatusChange(selectedLecture.id, status); setSelectedLecture(null); }} className={`flex flex-col items-center gap-1.5 p-3 rounded-xl text-white text-xs font-semibold transition ${className}`}><Icon className="h-4 w-4" />{label}</button>
+                <button
+                  key={status}
+                  onClick={() => {
+                    handleStatusChange(selectedLecture.id, status);
+                    setSelectedLecture(null);
+                  }}
+                  className={`flex flex-col items-center gap-1.5 p-3 rounded-xl text-xs font-mono uppercase tracking-wider font-semibold transition-all shadow-paper-sm hover:scale-[1.02] active:scale-[0.98] ${className}`}
+                >
+                  <Icon className="h-4 w-4" />
+                  {label}
+                </button>
               ))}
             </div>
-            {selectedLecture.status !== 'SCHEDULED' && <button onClick={() => { handleStatusChange(selectedLecture.id, 'SCHEDULED'); setSelectedLecture(null); }} className="w-full py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs text-gray-300">Reset to scheduled</button>}
+
+            {selectedLecture.status !== 'SCHEDULED' && (
+              <button
+                onClick={() => {
+                  handleStatusChange(selectedLecture.id, 'SCHEDULED');
+                  setSelectedLecture(null);
+                }}
+                className="w-full py-2.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 text-[11px] font-mono uppercase tracking-wider text-paper-300 transition-colors"
+              >
+                Reset to Scheduled
+              </button>
+            )}
           </div>
         </div>
       )}
