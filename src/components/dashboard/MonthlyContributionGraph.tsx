@@ -3,32 +3,15 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   format,
-  startOfMonth,
-  endOfMonth,
   startOfWeek,
   endOfWeek,
   eachDayOfInterval,
   isSameDay,
   isToday,
+  subWeeks,
   isSameMonth,
-  addMonths,
-  subMonths,
-  getDay,
+  addDays,
 } from 'date-fns';
-import {
-  ChevronLeft,
-  ChevronRight,
-  Flame,
-  CalendarCheck,
-  CheckCircle2,
-  XCircle,
-  Sun,
-  Clock,
-  Sparkles,
-  Award,
-  Activity,
-  Layers,
-} from 'lucide-react';
 import { fetchJson } from '@/lib/api-client';
 import { Lecture } from './LectureCard';
 
@@ -38,19 +21,17 @@ interface MonthlyContributionGraphProps {
   refreshTrigger?: number;
 }
 
-interface DayAttendanceData {
+interface DayData {
   date: Date;
   dateStr: string;
-  isCurrentMonth: boolean;
-  isCurrentDay: boolean;
-  lectures: Lecture[];
+  isToday: boolean;
   attendedCount: number;
   missedCount: number;
   holidayCount: number;
   scheduledCount: number;
   totalLectures: number;
-  percentage: number;
-  statusType: 'EMPTY' | 'MISSED' | 'LOW' | 'MEDIUM' | 'HIGH' | 'PERFECT' | 'HOLIDAY' | 'SCHEDULED';
+  level: 0 | 1 | 2 | 3 | 4; // 0 = empty/none, 1 = 1-25%, 2 = 26-50%, 3 = 51-75%, 4 = 76-100%
+  lectures: Lecture[];
 }
 
 export default function MonthlyContributionGraph({
@@ -58,501 +39,336 @@ export default function MonthlyContributionGraph({
   selectedDate,
   refreshTrigger = 0,
 }: MonthlyContributionGraphProps) {
-  const [currentMonth, setCurrentMonth] = useState<Date>(() => startOfMonth(new Date()));
-  const [monthLectures, setMonthLectures] = useState<Lecture[]>([]);
+  const [allLectures, setAllLectures] = useState<Lecture[]>([]);
+  const [semesterRange, setSemesterRange] = useState<{ start: Date; end: Date } | null>(null);
   const [loading, setLoading] = useState(true);
-  const [hoveredDay, setHoveredDay] = useState<DayAttendanceData | null>(null);
-  const [activeDay, setActiveDay] = useState<DayAttendanceData | null>(null);
+  const [hoveredDay, setHoveredDay] = useState<{ day: DayData; x: number; y: number } | null>(null);
 
-  // Fetch lectures for the currently viewed month (plus padding days)
-  const fetchMonthLectures = useCallback(async () => {
+  // Fetch all lectures and active semester
+  const fetchData = useCallback(async () => {
     try {
       setLoading(true);
-      const mStart = startOfWeek(startOfMonth(currentMonth), { weekStartsOn: 1 });
-      const mEnd = endOfWeek(endOfMonth(currentMonth), { weekStartsOn: 1 });
-      const startDateStr = format(mStart, 'yyyy-MM-dd');
-      const endDateStr = format(mEnd, 'yyyy-MM-dd');
+      const [lecturesRes, semesterRes] = await Promise.all([
+        fetchJson('/api/lectures', { ttl: 15000, swr: true }),
+        fetchJson('/api/semesters', { ttl: 30000, swr: true }),
+      ]);
 
-      const data = await fetchJson(`/api/lectures?startDate=${startDateStr}&endDate=${endDateStr}`, {
-        ttl: 15000,
-        swr: true,
-      });
-      if (data?.lectures) {
-        setMonthLectures(data.lectures);
+      if (lecturesRes?.lectures) {
+        setAllLectures(lecturesRes.lectures);
+      }
+      if (semesterRes?.activeSemester) {
+        setSemesterRange({
+          start: new Date(semesterRes.activeSemester.startDate),
+          end: new Date(semesterRes.activeSemester.endDate),
+        });
       }
     } catch (err) {
-      console.error('Failed to load month lectures for contribution graph', err);
+      console.error('Failed to load contribution data', err);
     } finally {
       setLoading(false);
     }
-  }, [currentMonth]);
+  }, []);
 
   useEffect(() => {
-    fetchMonthLectures();
-  }, [fetchMonthLectures, refreshTrigger]);
+    fetchData();
+  }, [fetchData, refreshTrigger]);
 
-  // Compute all grid days (Monday to Sunday rows, week columns)
-  const { weeks, monthStats, todayData } = useMemo(() => {
-    const mStart = startOfMonth(currentMonth);
-    const mEnd = endOfMonth(currentMonth);
-    const gridStart = startOfWeek(mStart, { weekStartsOn: 1 });
-    const gridEnd = endOfWeek(mEnd, { weekStartsOn: 1 });
+  // Compute the 52-week horizontal grid matching GitHub's contribution matrix
+  const { weeks, monthLabels, totalAttendedCount, totalHeldCount } = useMemo(() => {
+    const today = new Date();
+    // End on the coming Sunday of the current week (or semester end, whichever is later)
+    let gridEnd = endOfWeek(today, { weekStartsOn: 1 });
+    if (semesterRange?.end && semesterRange.end > gridEnd) {
+      gridEnd = endOfWeek(semesterRange.end, { weekStartsOn: 1 });
+    }
 
-    const allGridDays = eachDayOfInterval({ start: gridStart, end: gridEnd });
+    // Default to a 52-week (1-year) horizontal span, or starting from semester start
+    let gridStart = startOfWeek(subWeeks(gridEnd, 51), { weekStartsOn: 1 });
+    if (semesterRange?.start && semesterRange.start < gridStart) {
+      gridStart = startOfWeek(semesterRange.start, { weekStartsOn: 1 });
+    }
 
-    const dayDataList: DayAttendanceData[] = [];
-    let presentDayInfo: DayAttendanceData | null = null;
+    const allDays = eachDayOfInterval({ start: gridStart, end: gridEnd });
 
-    for (const day of allGridDays) {
-      const dayStr = format(day, 'yyyy-MM-dd');
-      const isCurrentMonth = isSameMonth(day, currentMonth);
-      const isCurrentDay = isToday(day);
+    // Map lectures by date string for fast O(1) lookup
+    const lecturesByDate = new Map<string, Lecture[]>();
+    let totalAttended = 0;
+    let totalHeld = 0;
 
-      const dayLectures = monthLectures
-        .filter((lec) => {
-          const lDateStr = typeof lec.date === 'string' ? lec.date.slice(0, 10) : format(new Date(lec.date), 'yyyy-MM-dd');
-          return lDateStr === dayStr || isSameDay(new Date(lec.date), day);
-        })
-        .reduce<Lecture[]>((acc, lec) => {
-          const isDup = acc.some((item) => item.id === lec.id || (item.subjectId === lec.subjectId && item.startTime === lec.startTime));
-          if (!isDup) acc.push(lec);
-          return acc;
-        }, [])
-        .sort((a, b) => a.startTime.localeCompare(b.startTime));
+    for (const lec of allLectures) {
+      const dStr = typeof lec.date === 'string' ? lec.date.slice(0, 10) : format(new Date(lec.date), 'yyyy-MM-dd');
+      const list = lecturesByDate.get(dStr) ?? [];
+      list.push(lec);
+      lecturesByDate.set(dStr, list);
+
+      if (lec.status === 'ATTENDED') {
+        totalAttended++;
+        totalHeld++;
+      } else if (lec.status === 'MISSED') {
+        totalHeld++;
+      }
+    }
+
+    // Build day objects
+    const dayDataList: DayData[] = allDays.map((day) => {
+      const dateStr = format(day, 'yyyy-MM-dd');
+      const dayLectures = lecturesByDate.get(dateStr) ?? [];
 
       const attendedCount = dayLectures.filter((l) => l.status === 'ATTENDED').length;
       const missedCount = dayLectures.filter((l) => l.status === 'MISSED').length;
       const holidayCount = dayLectures.filter((l) => l.status === 'HOLIDAY').length;
       const scheduledCount = dayLectures.filter((l) => l.status === 'SCHEDULED').length;
-      const heldCount = attendedCount + missedCount;
       const totalLectures = dayLectures.length;
+      const heldCount = attendedCount + missedCount;
 
-      const percentage = heldCount > 0 ? Math.round((attendedCount / heldCount) * 100) : 0;
+      let level: DayData['level'] = 0;
 
-      let statusType: DayAttendanceData['statusType'] = 'EMPTY';
-
-      if (totalLectures === 0) {
-        statusType = 'EMPTY';
-      } else if (holidayCount === totalLectures) {
-        statusType = 'HOLIDAY';
-      } else if (heldCount === 0 && scheduledCount > 0) {
-        statusType = 'SCHEDULED';
-      } else if (heldCount > 0) {
-        if (attendedCount === heldCount) {
-          statusType = 'PERFECT';
-        } else if (percentage >= 75) {
-          statusType = 'HIGH';
-        } else if (percentage >= 50) {
-          statusType = 'MEDIUM';
-        } else if (attendedCount > 0) {
-          statusType = 'LOW';
+      if (attendedCount > 0) {
+        if (heldCount > 0) {
+          const pct = attendedCount / heldCount;
+          if (pct >= 0.99) level = 4;
+          else if (pct >= 0.75) level = 3;
+          else if (pct >= 0.4) level = 2;
+          else level = 1;
         } else {
-          statusType = 'MISSED';
+          level = 4;
         }
+      } else if (missedCount > 0) {
+        level = 1; // Show minimal activity color for missed to reflect held class
       }
 
-      const dayObj: DayAttendanceData = {
+      return {
         date: day,
-        dateStr: dayStr,
-        isCurrentMonth,
-        isCurrentDay,
-        lectures: dayLectures,
+        dateStr,
+        isToday: isToday(day),
         attendedCount,
         missedCount,
         holidayCount,
         scheduledCount,
         totalLectures,
-        percentage,
-        statusType,
+        level,
+        lectures: dayLectures,
       };
+    });
 
-      if (isCurrentDay) {
-        presentDayInfo = dayObj;
-      }
-
-      dayDataList.push(dayObj);
-    }
-
-    let totalAttended = 0;
-    let totalHeld = 0;
-    let totalClasses = 0;
-    let perfectDays = 0;
-    let maxStreak = 0;
-    let tempStreak = 0;
-
-    for (const day of dayDataList) {
-      if (day.isCurrentMonth) {
-        totalAttended += day.attendedCount;
-        totalHeld += (day.attendedCount + day.missedCount);
-        totalClasses += day.totalLectures;
-
-        const heldCount = day.attendedCount + day.missedCount;
-        if (heldCount > 0 && day.attendedCount === heldCount) {
-          perfectDays++;
-          tempStreak++;
-          if (tempStreak > maxStreak) maxStreak = tempStreak;
-        } else if (day.missedCount > 0) {
-          tempStreak = 0;
-        }
-      }
-    }
-
-    const currentStreak = tempStreak;
-
-    // Group into week columns (each week has 7 days from Mon to Sun)
-    const weekColumns: DayAttendanceData[][] = [];
+    // Group into week columns (7 days per column: Mon = index 0 ... Sun = index 6)
+    const weekColumns: DayData[][] = [];
     for (let i = 0; i < dayDataList.length; i += 7) {
       weekColumns.push(dayDataList.slice(i, i + 7));
     }
 
-    const monthPct = totalHeld > 0 ? Math.round((totalAttended / totalHeld) * 1000) / 10 : 100;
+    // Calculate month labels positions across columns
+    const labels: Array<{ name: string; colIndex: number }> = [];
+    let lastMonth = -1;
+
+    weekColumns.forEach((week, colIdx) => {
+      // Check the first day or middle day of the week
+      const sampleDay = week[0]?.date || week[3]?.date;
+      if (sampleDay) {
+        const monthNum = sampleDay.getMonth();
+        if (monthNum !== lastMonth) {
+          labels.push({
+            name: format(sampleDay, 'MMM'),
+            colIndex: colIdx,
+          });
+          lastMonth = monthNum;
+        }
+      }
+    });
 
     return {
       weeks: weekColumns,
-      monthStats: {
-        totalAttended,
-        totalHeld,
-        totalClasses,
-        monthPct,
-        perfectDays,
-        streak: currentStreak,
-        maxStreak,
-      },
-      todayData: presentDayInfo,
+      monthLabels: labels,
+      totalAttendedCount: totalAttended,
+      totalHeldCount: totalHeld,
     };
-  }, [currentMonth, monthLectures]);
+  }, [allLectures, semesterRange]);
 
-  const handleCellClick = (dayData: DayAttendanceData) => {
-    setActiveDay(dayData);
-    if (onSelectDate) {
-      onSelectDate(dayData.date);
+  // Color mapper matching GitHub's exact dark mode palette
+  const getCellColor = (day: DayData) => {
+    if (day.totalLectures === 0) {
+      return 'bg-[#161b22] border-[#21262d]';
     }
-  };
 
-  const getCellColor = (status: DayAttendanceData['statusType'], isCurrentMonth: boolean) => {
-    if (!isCurrentMonth) {
-      return 'bg-white/[0.015] border-white/[0.03] opacity-30';
+    if (day.holidayCount > 0 && day.attendedCount === 0 && day.missedCount === 0) {
+      return 'bg-[#d29922]/40 border-[#d29922]/60';
     }
-    switch (status) {
-      case 'PERFECT':
-        return 'bg-emerald-500 border-emerald-400 text-white shadow-[0_0_8px_rgba(16,185,129,0.35)]';
-      case 'HIGH':
-        return 'bg-emerald-600 border-emerald-500 text-white';
-      case 'MEDIUM':
-        return 'bg-emerald-700/80 border-emerald-600 text-emerald-100';
-      case 'LOW':
-        return 'bg-emerald-900 border-emerald-800 text-emerald-200';
-      case 'MISSED':
-        return 'bg-rose-500/80 border-rose-400 text-white';
-      case 'HOLIDAY':
-        return 'bg-amber-500/80 border-amber-400 text-white';
-      case 'SCHEDULED':
-        return 'bg-white/[0.08] border-white/20 text-paper-300';
-      case 'EMPTY':
+
+    if (day.attendedCount === 0 && day.missedCount > 0) {
+      return 'bg-[#da3633]/60 border-[#da3633]/80';
+    }
+
+    if (day.scheduledCount > 0 && day.attendedCount === 0 && day.missedCount === 0) {
+      return 'bg-[#21262d] border-[#30363d]';
+    }
+
+    switch (day.level) {
+      case 4:
+        return 'bg-[#39d353] border-[#39d353]'; // 100% / Highest (bright GitHub green)
+      case 3:
+        return 'bg-[#26a641] border-[#26a641]'; // 75-99%
+      case 2:
+        return 'bg-[#006d32] border-[#006d32]'; // 40-74%
+      case 1:
+        return 'bg-[#0e4429] border-[#0e4429]'; // 1-39%
+      case 0:
       default:
-        return 'bg-white/[0.03] border-white/[0.06] hover:border-white/20';
+        return 'bg-[#161b22] border-[#21262d]';
     }
   };
 
-  const dayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const handleMouseEnter = (event: React.MouseEvent<HTMLDivElement>, day: DayData) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    setHoveredDay({
+      day,
+      x: rect.left + rect.width / 2,
+      y: rect.top,
+    });
+  };
+
+  const handleMouseLeave = () => {
+    setHoveredDay(null);
+  };
+
+  const handleCellClick = (day: DayData) => {
+    if (onSelectDate) {
+      onSelectDate(day.date);
+    }
+  };
 
   return (
-    <div className="paper-card p-5 sm:p-6 rounded-2xl border border-white/10 shadow-paper-sm space-y-6">
-      {/* ── Header Bar ── */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/[0.08] pb-4">
-        <div className="flex items-center gap-3.5">
-          <div className="h-10 w-10 rounded-xl bg-white/[0.05] border border-white/10 flex items-center justify-center text-white shrink-0">
-            <Activity className="h-4 w-4 text-emerald-400" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-base sm:text-lg font-bold text-white tracking-tight">
-                Monthly Attendance Ledger Activity
-              </h2>
-              <span className="px-2 py-0.5 rounded font-mono text-[9px] font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/25 uppercase tracking-wider">
-                GitHub Matrix
-              </span>
-            </div>
-            <p className="text-xs text-paper-400 font-light mt-0.5">
-              Daily lecture attendance heatmap for {format(currentMonth, 'MMMM yyyy')}.
-            </p>
-          </div>
-        </div>
-
-        {/* Month Navigation & Jump */}
-        <div className="flex items-center gap-2 self-start md:self-auto">
-          <button
-            onClick={() => setCurrentMonth((m) => subMonths(m, 1))}
-            className="p-2 rounded-xl bg-white/[0.04] border border-white/10 hover:bg-white/[0.08] text-paper-300 hover:text-white transition-all"
-            aria-label="Previous month"
-            title="Previous month"
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </button>
-
-          <span className="px-3 py-1.5 rounded-xl bg-white/[0.03] border border-white/10 font-mono text-xs font-bold text-white min-w-[120px] text-center uppercase tracking-wider">
-            {format(currentMonth, 'MMMM yyyy')}
-          </span>
-
-          <button
-            onClick={() => setCurrentMonth((m) => addMonths(m, 1))}
-            className="p-2 rounded-xl bg-white/[0.04] border border-white/10 hover:bg-white/[0.08] text-paper-300 hover:text-white transition-all"
-            aria-label="Next month"
-            title="Next month"
-          >
-            <ChevronRight className="h-4 w-4" />
-          </button>
-
-          <button
-            onClick={() => setCurrentMonth(startOfMonth(new Date()))}
-            className="px-3 py-1.5 rounded-xl bg-white hover:bg-stone-200 text-paper-950 font-bold text-xs font-mono uppercase tracking-wider shadow-paper-sm transition-all ml-1"
-          >
-            Current Month
-          </button>
-        </div>
-      </div>
-
-      {/* ── Key Monthly Statistics & Present Day Badge ── */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {/* Present Day Metric */}
-        <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.08] relative overflow-hidden">
-          <div className="flex items-center justify-between text-[10px] font-mono uppercase tracking-wider text-paper-400 mb-1">
-            <span className="flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-              Today
-            </span>
-            <span>{format(new Date(), 'd MMM')}</span>
-          </div>
-          <p className="text-base font-bold text-white font-mono">
-            {todayData && todayData.totalLectures > 0
-              ? `${todayData.attendedCount}/${todayData.totalLectures} Done`
-              : 'No Classes'}
-          </p>
-          <p className="text-[11px] text-paper-400 mt-0.5 font-light truncate">
-            {todayData && todayData.totalLectures > 0
-              ? todayData.statusType === 'PERFECT'
-                ? 'All attended today 🎉'
-                : `${todayData.percentage}% attendance`
-              : 'Rest day / Off'}
-          </p>
-        </div>
-
-        {/* Month Attendance */}
-        <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.08]">
-          <div className="flex items-center justify-between text-[10px] font-mono uppercase tracking-wider text-paper-400 mb-1">
-            <span>Month Rate</span>
-            <Award className="h-3.5 w-3.5 text-stone-300" />
-          </div>
-          <p className="text-base font-bold text-white font-mono">
-            {monthStats.totalHeld > 0 ? `${monthStats.monthPct}%` : '100%'}
-          </p>
-          <p className="text-[11px] text-paper-400 mt-0.5 font-light">
-            {monthStats.totalAttended}/{monthStats.totalHeld} lectures held
-          </p>
-        </div>
-
-        {/* Perfect Days */}
-        <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.08]">
-          <div className="flex items-center justify-between text-[10px] font-mono uppercase tracking-wider text-paper-400 mb-1">
-            <span>Full Attendance</span>
-            <Sparkles className="h-3.5 w-3.5 text-emerald-400" />
-          </div>
-          <p className="text-base font-bold text-emerald-300 font-mono">
-            {monthStats.perfectDays} Days
-          </p>
-          <p className="text-[11px] text-paper-400 mt-0.5 font-light">
-            100% attended days
-          </p>
-        </div>
-
-        {/* Current Streak */}
-        <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.08]">
-          <div className="flex items-center justify-between text-[10px] font-mono uppercase tracking-wider text-paper-400 mb-1">
-            <span>Streak</span>
-            <Flame className="h-3.5 w-3.5 text-orange-400" />
-          </div>
-          <p className="text-base font-bold text-orange-300 font-mono">
-            {monthStats.streak} {monthStats.streak === 1 ? 'Day' : 'Days'}
-          </p>
-          <p className="text-[11px] text-paper-400 mt-0.5 font-light">
-            Best this month: {monthStats.maxStreak}d
-          </p>
-        </div>
-      </div>
-
-      {/* ── Contribution Matrix (GitHub Style) ── */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <p className="text-[11px] font-mono uppercase tracking-wider text-paper-400">
-            Attendance Grid · {format(currentMonth, 'MMMM yyyy')}
-          </p>
-          <span className="text-[10px] font-mono text-paper-400 hidden sm:inline">
-            Click any day to jump weekly schedule
+    <div className="paper-card p-4 sm:p-5 rounded-2xl border border-white/10 shadow-paper-sm text-[#7d8590] select-none">
+      {/* ── Top Header Bar ── */}
+      <div className="flex items-center justify-between gap-3 mb-3">
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-mono font-bold text-white tracking-tight">
+            {totalAttendedCount} {totalAttendedCount === 1 ? 'lecture' : 'lectures'} attended in active term
           </span>
         </div>
+        <span className="text-[10px] font-mono text-paper-400">
+          Click any square to view week
+        </span>
+      </div>
 
-        <div className="overflow-x-auto pb-2">
-          <div className="inline-flex gap-2 min-w-full justify-start sm:justify-center p-3 rounded-2xl bg-paper-900/80 border border-white/[0.06]">
-            {/* Day Labels Column */}
-            <div className="grid grid-rows-7 gap-1.5 pr-2 border-r border-white/[0.06] text-[10px] font-mono text-paper-400">
-              {dayLabels.map((lbl, idx) => (
-                <div key={lbl} className="h-7 flex items-center justify-end font-semibold uppercase">
-                  {idx % 2 === 0 ? lbl : ''}
-                </div>
-              ))}
+      {/* ── GitHub Contribution Heatmap Grid ── */}
+      <div className="overflow-x-auto pb-1 scrollbar-thin">
+        <div className="inline-block min-w-full">
+          {/* Month Labels Header */}
+          <div className="relative h-4 mb-1 text-[10px] font-mono text-[#7d8590]">
+            {monthLabels.map((lbl, idx) => {
+              // Calculate left offset based on column index: 28px left margin + colIndex * 13.5px
+              const leftOffset = 28 + lbl.colIndex * 13.5;
+              return (
+                <span
+                  key={`${lbl.name}-${idx}`}
+                  className="absolute"
+                  style={{ left: `${leftOffset}px` }}
+                >
+                  {lbl.name}
+                </span>
+              );
+            })}
+          </div>
+
+          {/* Grid: Left Day Labels (Mon, Wed, Fri) + Week Columns */}
+          <div className="flex items-start gap-1.5">
+            {/* Day of Week Labels (Mon = 0, Wed = 2, Fri = 4) */}
+            <div className="grid grid-rows-7 gap-[2.5px] text-[9px] font-mono text-[#7d8590] pr-1 pt-[1px] leading-[10px]">
+              <span className="h-[10px] flex items-center justify-end">Mon</span>
+              <span className="h-[10px]" />
+              <span className="h-[10px] flex items-center justify-end">Wed</span>
+              <span className="h-[10px]" />
+              <span className="h-[10px] flex items-center justify-end">Fri</span>
+              <span className="h-[10px]" />
+              <span className="h-[10px]" />
             </div>
 
             {/* Week Columns */}
-            {weeks.map((week, wIdx) => (
-              <div key={`week-${wIdx}`} className="grid grid-rows-7 gap-1.5">
-                {week.map((day) => {
-                  const colorClass = getCellColor(day.statusType, day.isCurrentMonth);
-                  const isPresentDay = day.isCurrentDay;
-                  const isSelected = selectedDate && isSameDay(day.date, selectedDate);
+            <div className="flex gap-[2.5px]">
+              {weeks.map((week, colIdx) => (
+                <div key={`col-${colIdx}`} className="grid grid-rows-7 gap-[2.5px]">
+                  {week.map((day) => {
+                    const colorClass = getCellColor(day);
+                    const isSelected = selectedDate && isSameDay(day.date, selectedDate);
+                    const isTodayDate = day.isToday;
 
-                  return (
-                    <button
-                      key={day.dateStr}
-                      type="button"
-                      onClick={() => handleCellClick(day)}
-                      onMouseEnter={() => setHoveredDay(day)}
-                      onMouseLeave={() => setHoveredDay(null)}
-                      className={`h-7 w-7 sm:h-8 sm:w-8 rounded-lg text-[10px] font-mono font-bold flex items-center justify-center relative transition-all duration-150 border ${colorClass} ${
-                        isPresentDay
-                          ? 'ring-2 ring-white ring-offset-2 ring-offset-paper-950 scale-105 z-10'
-                          : isSelected
-                          ? 'ring-1 ring-emerald-400 ring-offset-1 ring-offset-paper-950'
-                          : 'hover:scale-110 hover:z-10'
-                      }`}
-                      title={`${format(day.date, 'EEEE, d MMM yyyy')}: ${
-                        day.totalLectures > 0
-                          ? `${day.attendedCount}/${day.totalLectures} attended (${day.percentage}%)`
-                          : 'No classes'
-                      }`}
-                    >
-                      {/* Day Number */}
-                      <span className={day.isCurrentMonth ? 'text-inherit opacity-90' : 'text-paper-600 opacity-40'}>
-                        {format(day.date, 'd')}
-                      </span>
-
-                      {/* Present Day Indicator Dot */}
-                      {isPresentDay && (
-                        <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-emerald-400 ring-1 ring-paper-950 shadow-sm" />
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            ))}
+                    return (
+                      <div
+                        key={day.dateStr}
+                        onClick={() => handleCellClick(day)}
+                        onMouseEnter={(e) => handleMouseEnter(e, day)}
+                        onMouseLeave={handleMouseLeave}
+                        className={`w-[11px] h-[11px] rounded-[2px] border transition-transform cursor-pointer relative ${colorClass} ${
+                          isTodayDate
+                            ? 'ring-1 ring-white shadow-[0_0_6px_rgba(255,255,255,0.6)] scale-110 z-10'
+                            : isSelected
+                            ? 'ring-1 ring-emerald-400 scale-105 z-10'
+                            : 'hover:scale-125 hover:z-20'
+                        }`}
+                      />
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>
 
-      {/* ── Hovered / Active Day Details Card ── */}
-      {(hoveredDay || activeDay) && (
-        <div className="p-4 rounded-xl bg-white/[0.03] border border-white/10 space-y-3 animate-in">
-          {(() => {
-            const day = hoveredDay || activeDay!;
-            return (
-              <>
-                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/[0.06] pb-2.5">
-                  <div className="flex items-center gap-2">
-                    <CalendarCheck className="h-4 w-4 text-emerald-400" />
-                    <span className="font-bold text-xs text-white">
-                      {format(day.date, 'EEEE, d MMMM yyyy')}
-                    </span>
-                    {day.isCurrentDay && (
-                      <span className="px-1.5 py-0.2 rounded font-mono text-[9px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 uppercase">
-                        Present Day
-                      </span>
-                    )}
-                  </div>
+      {/* ── Bottom Legend & Info ── */}
+      <div className="flex flex-wrap items-center justify-between gap-3 mt-3 pt-2 border-t border-white/[0.06] text-[10px] font-mono text-[#7d8590]">
+        <span className="hover:text-white transition-colors cursor-pointer">
+          Learn how we calculate attendance
+        </span>
 
-                  <div className="flex items-center gap-2 font-mono text-xs">
-                    {day.totalLectures > 0 ? (
-                      <>
-                        <span className="text-paper-400">
-                          {day.attendedCount}/{day.totalLectures} Attended
-                        </span>
-                        <span className="font-bold text-white px-2 py-0.5 rounded bg-white/10">
-                          {day.percentage}%
-                        </span>
-                      </>
-                    ) : (
-                      <span className="text-paper-500">No scheduled classes</span>
-                    )}
-                  </div>
-                </div>
-
-                {/* List of lectures on that day */}
-                {day.lectures.length > 0 ? (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 pt-1">
-                    {day.lectures.map((lec) => {
-                      const statusColor =
-                        lec.status === 'ATTENDED'
-                          ? 'text-emerald-300 bg-emerald-500/10 border-emerald-500/20'
-                          : lec.status === 'MISSED'
-                          ? 'text-orange-300 bg-orange-500/10 border-orange-500/20'
-                          : lec.status === 'HOLIDAY'
-                          ? 'text-amber-300 bg-amber-500/10 border-amber-500/20'
-                          : 'text-paper-300 bg-white/5 border-white/10';
-
-                      return (
-                        <div
-                          key={lec.id}
-                          className="p-2.5 rounded-lg bg-white/[0.02] border border-white/[0.05] flex items-center justify-between gap-2"
-                        >
-                          <div className="min-w-0">
-                            <p className="text-xs font-semibold text-white truncate">{lec.subject.name}</p>
-                            <p className="text-[10px] font-mono text-paper-400">{lec.startTime} – {lec.endTime}</p>
-                          </div>
-                          <span className={`px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase border ${statusColor}`}>
-                            {lec.status}
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <p className="text-xs text-paper-400 font-light">No lectures recorded for this date.</p>
-                )}
-              </>
-            );
-          })()}
-        </div>
-      )}
-
-      {/* ── Legend Bar (GitHub Style) ── */}
-      <div className="flex flex-wrap items-center justify-between gap-3 pt-2 text-[10px] font-mono text-paper-400 border-t border-white/[0.06]">
+        {/* GitHub Less -> More Scale */}
         <div className="flex items-center gap-1.5">
           <span>Less</span>
-          <span className="h-3.5 w-3.5 rounded bg-white/[0.03] border border-white/[0.06]" title="No classes" />
-          <span className="h-3.5 w-3.5 rounded bg-emerald-900 border border-emerald-800" title="Low (<50%)" />
-          <span className="h-3.5 w-3.5 rounded bg-emerald-700/80 border border-emerald-600" title="Medium (50-74%)" />
-          <span className="h-3.5 w-3.5 rounded bg-emerald-600 border border-emerald-500" title="Good (75-99%)" />
-          <span className="h-3.5 w-3.5 rounded bg-emerald-500 border border-emerald-400" title="100% Perfect" />
+          <span className="w-[10px] h-[10px] rounded-[2px] bg-[#161b22] border border-[#21262d]" title="No attendance" />
+          <span className="w-[10px] h-[10px] rounded-[2px] bg-[#0e4429] border border-[#0e4429]" title="Low" />
+          <span className="w-[10px] h-[10px] rounded-[2px] bg-[#006d32] border border-[#006d32]" title="Medium" />
+          <span className="w-[10px] h-[10px] rounded-[2px] bg-[#26a641] border border-[#26a641]" title="Good" />
+          <span className="w-[10px] h-[10px] rounded-[2px] bg-[#39d353] border border-[#39d353]" title="100% Attended" />
           <span>More</span>
         </div>
-
-        <div className="flex items-center gap-3">
-          <span className="flex items-center gap-1.5">
-            <span className="h-3 w-3 rounded bg-rose-500/80 border border-rose-400" />
-            Missed
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="h-3 w-3 rounded bg-amber-500/80 border border-amber-400" />
-            Holiday
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="h-3 w-3 rounded bg-white/[0.08] border border-white/20" />
-            Scheduled
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="h-3 w-3 rounded-full ring-2 ring-white bg-emerald-500" />
-            Today
-          </span>
-        </div>
       </div>
+
+      {/* ── Fixed Floating Tooltip (GitHub Style) ── */}
+      {hoveredDay && (
+        <div
+          className="fixed z-50 pointer-events-none transform -translate-x-1/2 -translate-y-full mb-2"
+          style={{
+            left: `${hoveredDay.x}px`,
+            top: `${hoveredDay.y - 8}px`,
+          }}
+        >
+          <div className="bg-[#1b1f24] text-white text-[11px] font-mono px-3 py-2 rounded-lg border border-[#30363d] shadow-xl whitespace-nowrap space-y-1">
+            <p className="font-bold text-stone-200">
+              {hoveredDay.day.attendedCount > 0
+                ? `${hoveredDay.day.attendedCount} ${
+                    hoveredDay.day.attendedCount === 1 ? 'lecture' : 'lectures'
+                  } attended on ${format(hoveredDay.day.date, 'MMM d, yyyy')}`
+                : hoveredDay.day.missedCount > 0
+                ? `${hoveredDay.day.missedCount} missed on ${format(hoveredDay.day.date, 'MMM d, yyyy')}`
+                : hoveredDay.day.holidayCount > 0
+                ? `Holiday on ${format(hoveredDay.day.date, 'MMM d, yyyy')}`
+                : `No lectures on ${format(hoveredDay.day.date, 'MMM d, yyyy')}`}
+            </p>
+
+            {hoveredDay.day.totalLectures > 0 && (
+              <div className="text-[10px] text-[#7d8590] pt-0.5 border-t border-[#30363d] flex gap-2">
+                <span>Total: {hoveredDay.day.totalLectures}</span>
+                {hoveredDay.day.attendedCount > 0 && (
+                  <span className="text-emerald-400">Attended: {hoveredDay.day.attendedCount}</span>
+                )}
+                {hoveredDay.day.missedCount > 0 && (
+                  <span className="text-rose-400">Missed: {hoveredDay.day.missedCount}</span>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
