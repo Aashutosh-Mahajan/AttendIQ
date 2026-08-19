@@ -38,9 +38,13 @@ export default function AppShell({ children }: AppShellProps) {
   );
 
   useEffect(() => {
-    if (isAuthPage) { setAuthReady(true); return; }
+    if (isAuthPage) {
+      setAuthReady(true);
+      return;
+    }
 
-    const semesterPromise = fetchJson('/api/semesters', { ttl: 30000 })
+    // Load active semester info (cached with SWR)
+    fetchJson('/api/semesters', { ttl: 60000, swr: true })
       .then((data) => {
         if (data?.activeSemester) {
           setSemesterInfo({ name: data.activeSemester.name });
@@ -48,7 +52,8 @@ export default function AppShell({ children }: AppShellProps) {
       })
       .catch(() => {});
 
-    const authPromise = supabase.auth.getUser().then(({ data: { user } }) => {
+    // Initial auth check
+    supabase.auth.getUser().then(({ data: { user } }) => {
       if (user) {
         const displayName =
           user.user_metadata?.name ||
@@ -56,13 +61,31 @@ export default function AppShell({ children }: AppShellProps) {
           user.email?.split('@')[0] ||
           'Student';
         setUserName(displayName);
+        setAuthReady(true);
       } else {
         window.location.assign('/login');
       }
-    }).catch(() => window.location.assign('/login'));
+    }).catch(() => {
+      window.location.assign('/login');
+    });
 
-    Promise.allSettled([semesterPromise, authPromise]).then(() => setAuthReady(true));
-  }, [pathname, isAuthPage, supabase]);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!session && !isAuthPage) {
+        window.location.assign('/login');
+      } else if (session?.user) {
+        const displayName =
+          session.user.user_metadata?.name ||
+          session.user.user_metadata?.full_name ||
+          session.user.email?.split('@')[0] ||
+          'Student';
+        setUserName(displayName);
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [isAuthPage, supabase]);
 
   const logout = async () => {
     await supabase.auth.signOut();

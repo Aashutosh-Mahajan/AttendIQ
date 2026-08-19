@@ -18,6 +18,7 @@ export async function GET(req: Request) {
     const activeSemester = await prisma.semester.findFirst({
       where: { userId: user.id, isActive: true },
       orderBy: { createdAt: 'desc' },
+      select: { id: true },
     });
 
     if (!activeSemester) {
@@ -50,7 +51,15 @@ export async function GET(req: Request) {
     let lectures = await prisma.lectureInstance.findMany({
       where: whereClause,
       include: {
-        subject: true,
+        subject: {
+          select: {
+            id: true,
+            name: true,
+            code: true,
+            color: true,
+            targetPercentage: true,
+          },
+        },
       },
       orderBy: [{ date: 'asc' }, { startTime: 'asc' }],
     });
@@ -77,7 +86,17 @@ export async function GET(req: Request) {
           await generateLecturesForUser(user.id);
           lectures = await prisma.lectureInstance.findMany({
             where: whereClause,
-            include: { subject: true },
+            include: {
+              subject: {
+                select: {
+                  id: true,
+                  name: true,
+                  code: true,
+                  color: true,
+                  targetPercentage: true,
+                },
+              },
+            },
             orderBy: [{ date: 'asc' }, { startTime: 'asc' }],
           });
         }
@@ -144,6 +163,7 @@ export async function POST(req: Request) {
     const activeSemester = await prisma.semester.findFirst({
       where: { userId: user.id, isActive: true },
       orderBy: { createdAt: 'desc' },
+      select: { id: true },
     });
     if (!activeSemester) return NextResponse.json({ error: 'No active semester found.' }, { status: 400 });
 

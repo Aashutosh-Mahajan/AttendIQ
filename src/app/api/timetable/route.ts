@@ -38,6 +38,7 @@ export async function GET() {
     const activeSemester = await prisma.semester.findFirst({
       where: { userId: user.id, isActive: true },
       orderBy: { createdAt: 'desc' },
+      select: { id: true },
     });
 
     if (!activeSemester) return NextResponse.json({ slots: [] });
@@ -48,7 +49,14 @@ export async function GET() {
         subject: { semesterId: activeSemester.id },
       },
       include: {
-        subject: true,
+        subject: {
+          select: {
+            id: true,
+            name: true,
+            color: true,
+            code: true,
+          },
+        },
       },
       orderBy: [{ dayOfWeek: 'asc' }, { startTime: 'asc' }],
     });
@@ -70,6 +78,7 @@ export async function POST(req: Request) {
     const activeSemester = await prisma.semester.findFirst({
       where: { userId: user.id, isActive: true },
       orderBy: { createdAt: 'desc' },
+      select: { id: true },
     });
     if (!activeSemester) return NextResponse.json({ error: 'Create a semester before adding lectures.' }, { status: 400 });
     const parsedDayOfWeek = parseDayOfWeek(dayOfWeek);
@@ -84,6 +93,7 @@ export async function POST(req: Request) {
         isActive: true,
         subject: { semesterId: activeSemester.id },
       },
+      select: { id: true, startTime: true, endTime: true },
     });
 
     const isOverlap = existingSlots.some((slot) => {
@@ -112,7 +122,16 @@ export async function POST(req: Request) {
         room,
         isActive: true,
       },
-      include: { subject: true },
+      include: {
+        subject: {
+          select: {
+            id: true,
+            name: true,
+            color: true,
+            code: true,
+          },
+        },
+      },
     });
 
     // Auto generate lectures after slot creation
@@ -138,15 +157,20 @@ export async function PUT(req: Request) {
     const activeSemester = await prisma.semester.findFirst({
       where: { userId: user.id, isActive: true },
       orderBy: { createdAt: 'desc' },
+      select: { id: true },
     });
     if (!activeSemester) return NextResponse.json({ error: 'No active semester found.' }, { status: 400 });
-    const current = await prisma.timetableSlot.findFirst({ where: { id, userId: user.id, subject: { semesterId: activeSemester.id } } });
+    const current = await prisma.timetableSlot.findFirst({
+      where: { id, userId: user.id, subject: { semesterId: activeSemester.id } },
+      select: { id: true },
+    });
     if (!current) return NextResponse.json({ error: 'Timetable slot not found.' }, { status: 404 });
     const subject = await resolveSubject(user.id, activeSemester.id, subjectName);
     if (!subject) return NextResponse.json({ error: 'Enter a subject name.' }, { status: 400 });
 
     const conflicts = await prisma.timetableSlot.findMany({
       where: { userId: user.id, dayOfWeek: parsedDayOfWeek, isActive: true, id: { not: id }, subject: { semesterId: activeSemester.id } },
+      select: { id: true, startTime: true, endTime: true },
     });
     if (conflicts.some((slot) => startTime < slot.endTime && slot.startTime < endTime)) {
       return NextResponse.json({ error: 'Timetable conflict! Another lecture already occupies that time.' }, { status: 400 });

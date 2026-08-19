@@ -289,8 +289,8 @@ export default function TimetableGrid() {
     try {
       setLoading(true);
       const [termsData, slotsData] = await Promise.all([
-        fetchJson('/api/semesters', { forceRefresh, ttl: 15000 }),
-        fetchJson('/api/timetable', { forceRefresh, ttl: 5000 }),
+        fetchJson('/api/semesters', { forceRefresh, ttl: 30000, swr: true }),
+        fetchJson('/api/timetable', { forceRefresh, ttl: 15000, swr: true }),
       ]);
       setSemester(termsData.activeSemester ?? null);
       setTerms(termsData.semesters ?? []);

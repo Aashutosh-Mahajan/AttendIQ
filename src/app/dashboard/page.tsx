@@ -5,13 +5,24 @@ import WeeklyView from '@/components/dashboard/WeeklyView';
 import Link from 'next/link';
 import Image from 'next/image';
 import { BookOpen, Clock, ArrowRight, Sparkles, FileSpreadsheet } from 'lucide-react';
-import { fetchJson } from '@/lib/api-client';
+import { fetchJson, prefetchJson } from '@/lib/api-client';
 
 export default function DashboardPage() {
   const [hasSubjects, setHasSubjects] = useState<boolean | null>(null);
 
   useEffect(() => {
-    fetchJson('/api/subjects')
+    // Warm up the lectures cache in parallel
+    const now = new Date();
+    const dayOfWeek = (now.getDay() + 6) % 7; // Monday = 0
+    const monday = new Date(now);
+    monday.setDate(now.getDate() - dayOfWeek);
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+    const startStr = monday.toISOString().slice(0, 10);
+    const endStr = sunday.toISOString().slice(0, 10);
+    prefetchJson(`/api/lectures?startDate=${startStr}&endDate=${endStr}`, { ttl: 10000, swr: true });
+
+    fetchJson('/api/subjects', { ttl: 15000, swr: true })
       .then((data) => {
         setHasSubjects(Boolean(data?.subjects && data.subjects.length > 0));
       })

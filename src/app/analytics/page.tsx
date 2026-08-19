@@ -1,10 +1,16 @@
 'use client';
 
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import { useEffect, useState } from 'react';
 import { BarChart3, ArrowRight } from 'lucide-react';
-import AttendanceCharts, { SubjectAnalytics, TrendPoint } from '@/components/analytics/AttendanceCharts';
+import type { SubjectAnalytics, TrendPoint } from '@/components/analytics/AttendanceCharts';
 import { fetchJson } from '@/lib/api-client';
+
+const AttendanceCharts = dynamic(() => import('@/components/analytics/AttendanceCharts'), {
+  ssr: false,
+  loading: () => <div className="h-96 rounded-2xl paper-card border border-white/5 animate-pulse" />,
+});
 
 export default function AnalyticsPage() {
   const [subjects, setSubjects] = useState<SubjectAnalytics[]>([]);
@@ -17,9 +23,9 @@ export default function AnalyticsPage() {
     const load = async () => {
       try {
         const [subjectData, termData, lecturesData] = await Promise.all([
-          fetchJson('/api/subjects', { ttl: 5000 }),
-          fetchJson('/api/semesters', { ttl: 15000 }),
-          fetchJson('/api/lectures', { ttl: 5000 }),
+          fetchJson('/api/subjects', { ttl: 15000, swr: true }),
+          fetchJson('/api/semesters', { ttl: 30000, swr: true }),
+          fetchJson('/api/lectures', { ttl: 15000, swr: true }),
         ]);
 
         setHasSemester(Boolean(termData.activeSemester));

@@ -6,11 +6,21 @@ export async function generateLecturesForUser(userId: string) {
   const activeSemester = await prisma.semester.findFirst({
     where: { userId, isActive: true },
     orderBy: { createdAt: 'desc' },
-    include: {
+    select: {
+      id: true,
+      startDate: true,
+      endDate: true,
       subjects: {
-        include: {
+        select: {
+          id: true,
           timetableSlots: {
             where: { isActive: true },
+            select: {
+              id: true,
+              dayOfWeek: true,
+              startTime: true,
+              endTime: true,
+            },
           },
         },
       },

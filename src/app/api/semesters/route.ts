@@ -10,14 +10,15 @@ export async function GET() {
     const user = await getUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const activeSemester = await prisma.semester.findFirst({
-      where: { userId: user.id, isActive: true },
+    const allSemesters = await prisma.semester.findMany({
+      where: { userId: user.id },
       orderBy: { createdAt: 'desc' },
       include: {
         subjects: {
           include: {
             timetableSlots: {
               where: { isActive: true },
+              select: { id: true, dayOfWeek: true, startTime: true, endTime: true, room: true, isActive: true },
             },
             lectureInstances: {
               select: { status: true },
@@ -27,19 +28,7 @@ export async function GET() {
       },
     });
 
-    const allSemesters = await prisma.semester.findMany({
-      where: { userId: user.id },
-      orderBy: { createdAt: 'desc' },
-      include: {
-        subjects: {
-          include: {
-            lectureInstances: {
-              select: { status: true },
-            },
-          },
-        },
-      },
-    });
+    const activeSemester = allSemesters.find((s) => s.isActive) ?? null;
 
     const semesters = allSemesters.map((semester) => {
       const lectures = semester.subjects.flatMap((subject) => subject.lectureInstances);

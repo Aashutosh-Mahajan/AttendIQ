@@ -43,8 +43,8 @@ export default function SubjectsPage() {
     try {
       setLoading(true);
       const [subjectData, termData] = await Promise.all([
-        fetchJson('/api/subjects', { forceRefresh, ttl: 5000 }),
-        fetchJson('/api/semesters', { forceRefresh, ttl: 15000 }),
+        fetchJson('/api/subjects', { forceRefresh, ttl: 15000, swr: true }),
+        fetchJson('/api/semesters', { forceRefresh, ttl: 30000, swr: true }),
       ]);
       setSubjects(subjectData.subjects ?? []);
       setHasSemester(Boolean(termData.activeSemester));

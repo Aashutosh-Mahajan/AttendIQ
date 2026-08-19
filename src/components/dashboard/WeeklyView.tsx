@@ -171,7 +171,8 @@ export default function WeeklyView() {
 
       const data = await fetchJson(`/api/lectures?startDate=${startDate}&endDate=${endDate}`, {
         forceRefresh,
-        ttl: 5000,
+        ttl: 10000,
+        swr: true,
       });
       if (data.lectures) setLectures(data.lectures);
     } catch (err) {
@@ -183,7 +184,7 @@ export default function WeeklyView() {
 
   const fetchOverallHealth = React.useCallback(async (forceRefresh = false) => {
     try {
-      const data = await fetchJson('/api/subjects', { forceRefresh, ttl: 5000 });
+      const data = await fetchJson('/api/subjects', { forceRefresh, ttl: 15000, swr: true });
       if (data.subjects && data.subjects.length > 0) {
         let totalCounted = 0, totalAttended = 0, totalBunkable = 0, totalMustAttend = 0;
         data.subjects.forEach((s: any) => {
@@ -208,8 +209,11 @@ export default function WeeklyView() {
 
   useEffect(() => {
     fetchLectures();
+  }, [fetchLectures]);
+
+  useEffect(() => {
     fetchOverallHealth();
-  }, [fetchLectures, fetchOverallHealth]);
+  }, [fetchOverallHealth]);
 
   const handleStatusChange = async (id: string, nextStatus: Lecture['status']) => {
     // Instant optimistic update

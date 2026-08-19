@@ -11,6 +11,7 @@ export async function GET() {
     const activeSemester = await prisma.semester.findFirst({
       where: { userId: user.id, isActive: true },
       orderBy: { createdAt: 'desc' },
+      select: { id: true },
     });
 
     if (!activeSemester) {
