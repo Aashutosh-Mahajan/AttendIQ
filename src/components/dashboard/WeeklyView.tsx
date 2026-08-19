@@ -32,6 +32,7 @@ import {
 } from 'lucide-react';
 import LectureCard, { Lecture } from './LectureCard';
 import LiveClock from './LiveClock';
+import MonthlyContributionGraph from './MonthlyContributionGraph';
 
 /* ─── Mini Calendar Component ─── */
 function MiniCalendar({
@@ -160,6 +161,7 @@ export default function WeeklyView() {
     bunkable: 0,
     mustAttend: 0,
   });
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   const weekDays = [0, 1, 2, 3, 4, 5].map((offset) => addDays(currentWeekStart, offset));
 
@@ -220,6 +222,7 @@ export default function WeeklyView() {
     setLectures((prev) =>
       prev.map((lec) => (lec.id === id ? { ...lec, status: nextStatus } : lec))
     );
+    setRefreshTrigger((prev) => prev + 1);
     try {
       invalidateCache('/api/lectures');
       invalidateCache('/api/subjects');
@@ -230,6 +233,7 @@ export default function WeeklyView() {
       });
       if (!response.ok) throw new Error('Unable to update attendance.');
       fetchOverallHealth(true);
+      setRefreshTrigger((prev) => prev + 1);
     } catch {
       fetchLectures(true);
     }
@@ -243,6 +247,7 @@ export default function WeeklyView() {
         isSameDay(new Date(lec.date), dayDate) ? { ...lec, status } : lec
       )
     );
+    setRefreshTrigger((prev) => prev + 1);
     try {
       invalidateCache('/api/lectures');
       invalidateCache('/api/subjects');
@@ -253,6 +258,7 @@ export default function WeeklyView() {
       });
       if (!response.ok) throw new Error('Unable to update attendance.');
       fetchOverallHealth(true);
+      setRefreshTrigger((prev) => prev + 1);
     } catch {
       fetchLectures(true);
     }
@@ -457,6 +463,13 @@ export default function WeeklyView() {
           );
         })}
       </div>
+
+      {/* ── GitHub-Style Monthly Attendance Contribution Matrix ── */}
+      <MonthlyContributionGraph
+        onSelectDate={handleCalendarSelect}
+        selectedDate={currentWeekStart}
+        refreshTrigger={refreshTrigger}
+      />
 
       {/* ── Attendance Modal Dialog ── */}
       {selectedLecture && (
