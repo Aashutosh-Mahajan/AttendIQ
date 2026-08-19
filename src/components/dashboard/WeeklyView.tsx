@@ -29,6 +29,7 @@ import {
   XCircle,
   X,
   Flame,
+  Activity,
 } from 'lucide-react';
 import LectureCard, { Lecture } from './LectureCard';
 import LiveClock from './LiveClock';
@@ -324,7 +325,18 @@ export default function WeeklyView() {
           </div>
 
           {/* Right: navigation controls */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={() => {
+                const el = document.getElementById('monthly-activity');
+                el?.scrollIntoView({ behavior: 'smooth' });
+              }}
+              className="hidden sm:inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 text-paper-300 hover:text-white text-xs font-mono uppercase tracking-wider transition-colors"
+              title="Jump to Monthly Contribution Graph"
+            >
+              <Activity className="h-3.5 w-3.5 text-emerald-400" />
+              <span>Month Matrix</span>
+            </button>
             <LiveClock />
             <div className="flex items-center gap-1">
               <button
@@ -379,7 +391,7 @@ export default function WeeklyView() {
           return (
             <div
               key={dayDate.toISOString()}
-              className={`rounded-2xl flex flex-col min-h-[420px] transition-all duration-150 paper-card border ${
+              className={`rounded-2xl flex flex-col min-h-[350px] transition-all duration-150 paper-card border ${
                 isCurrentDay
                   ? 'border-white/30 shadow-paper-md bg-white/[0.03]'
                   : 'border-white/[0.08]'
@@ -465,11 +477,13 @@ export default function WeeklyView() {
       </div>
 
       {/* ── GitHub-Style Monthly Attendance Contribution Matrix ── */}
-      <MonthlyContributionGraph
-        onSelectDate={handleCalendarSelect}
-        selectedDate={currentWeekStart}
-        refreshTrigger={refreshTrigger}
-      />
+      <div id="monthly-activity" className="pt-2">
+        <MonthlyContributionGraph
+          onSelectDate={handleCalendarSelect}
+          selectedDate={currentWeekStart}
+          refreshTrigger={refreshTrigger}
+        />
+      </div>
 
       {/* ── Attendance Modal Dialog ── */}
       {selectedLecture && (
